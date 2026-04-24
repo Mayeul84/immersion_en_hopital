@@ -13,13 +13,11 @@ import scanpy as sc
 from matplotlib.lines import Line2D
 from scripts.gene_subsampling import thinning
 
-from typing import List, Optional
-
 from scripts.scoring import balanced_correctcells_score, compute_all_scores
-from scripts.utils import sctransform_manual, update_data
+from scripts.utils import update_data
 from scripts.utils import MAX_RNG_RANGE
 
-from scripts.clustering import find_best_resolution, cluster_data, average_leiden_run, best_leiden_run
+from scripts.clustering import find_best_resolution, average_leiden_run, best_leiden_run
 
 N_JOBS = 16
 DEFAULT_SAVE_DIR = "plots/fibroblast"
@@ -477,69 +475,6 @@ def study_sparsity_with_trajectories(cells, labels, ratio_candidates=None, n_run
         "correct": correct_history,
         "correct_detailed": correct_detailed_history
     }
-
-
-#def study_complete_sparsity(cells, labels, ratio_candidates=None, n_runs=50,
-#                            n_neighbors_candidates=None, search_resolution_method="optuna",
-#                            stats="average", runs_on_thinning=True, show=False, save=True, save_dir=DEFAULT_SAVE_DIR, save_name="study_complete_sparsity.png",
-#                            n_jobs=16):
-#    if n_neighbors_candidates is None:
-#        n_neighbors_candidates = [15, 50, 100, 200]
-#
-#    if show or save:
-#        n = len(n_neighbors_candidates)
-#        n_cols = int(np.ceil(np.sqrt(n)))
-#        n_rows = int(np.ceil(n / n_cols))
-#        fig, axs = plt.subplots(nrows=n_rows, ncols=n_cols, figsize=(n_cols*3 + 1, n_rows*3))
-#        axs = axs.flatten()
-#    else:
-#        axs = [None] * len(n_neighbors_candidates)
-#
-#    def run_one(n_neighbors, ax=None):
-#        if runs_on_thinning:
-#            # save=False pour empêcher les sous-graphiques d'écraser des fichiers individuellement
-#            return study_sparsity_stdthinning(
-#                cells=cells, labels=labels, ratio_candidates=ratio_candidates,
-#                n_runs=n_runs, n_neighbors=n_neighbors, search_resolution_method=search_resolution_method,
-#                show=False, save=False, ax=ax, legend=False, n_jobs=1 
-#            )
-#        else:
-#            return study_sparsity(
-#                cells=cells, labels=labels, ratio_candidates=ratio_candidates,
-#                n_runs=n_runs, n_neighbors=n_neighbors, search_resolution_method=search_resolution_method,
-#                stats=stats, show=False, save=False, ax=ax, legend=False
-#            )
-#
-#    results = Parallel(n_jobs=n_jobs)(
-#        delayed(run_one)(k, ax=axs[i] if (show or save) else None)
-#        for i, k in enumerate(n_neighbors_candidates)
-#    )
-#
-#    scores_history = dict(zip(n_neighbors_candidates, results))
-#
-#    if show or save:
-#        for i, n_neighbors in enumerate(n_neighbors_candidates):
-#            axs[i].set_title(f"k={n_neighbors}")
-#        
-#        for j in range(len(n_neighbors_candidates), len(axs)):
-#            axs[j].set_visible(False)
-#        
-#        plt.tight_layout()
-#        plt.grid(alpha=0.6)
-#        
-#        handles, labels_ = axs[0].get_legend_handles_labels()
-#        fig.legend(handles, labels_, loc='upper right', ncol=5)
-#        plt.subplots_adjust(top=0.75, wspace=0.5)
-#
-#        if save:
-#            os.makedirs(save_dir, exist_ok=True)
-#            fig.savefig(os.path.join(save_dir, save_name), dpi=200, bbox_inches='tight')
-#        if show:
-#            plt.show()
-#        else:
-#            plt.close(fig)
-#
-#    return scores_history
 
 def study_complete_sparsity(cells, labels, ratio_candidates=None, n_runs=50,
                             n_neighbors_candidates=None, search_resolution_method="optuna",

@@ -12,6 +12,11 @@ import matplotlib.pyplot as plt
 import os
 from sklearn.metrics import confusion_matrix
 
+import datetime
+
+def format_time(seconds):
+    return str(datetime.timedelta(seconds=int(seconds)))
+
 MAX_RNG_RANGE = 10000
 
 PROJECT_PATH = r"C:\Users\mayeu\Desktop\TRAVAIL\MVA\Cours\Projet médecin" # A CHANGER, METTRE LE CHEMIN ACTUEL
