@@ -19,32 +19,19 @@ def neyman_subsample(
     seed: int = 42,
 ) -> ad.AnnData:
     """
-    Sous-échantillonne les cellules appartenant à certains labels de `label_col`
+    Sous-échantillonne les CELLULES appartenant à certains labels de `label_col`
     via une allocation de Neyman (On tire un certain nombre de samples proportionnellement à la variancede chaque strate), stratifiée sur une ou plusieurs colonnes obs.
     Les cellules hors `target_labels` sont conservées intégralement.
-    Retourne un nouvel objet AnnData avec les cellules cibles sous-échantillonnées
-        et les autres cellules intactes.
+    Retourne un nouvel objet AnnData avec les cellules cibles sous-échantillonnées et les autres cellules intactes.
     
-    data : AnnData
-        Objet AnnData source.
-    target_labels : list of str
-        Labels dans `label_col` à sous-échantillonner.
-        Ex: ["Steroid cells", "T cells"]
-    stratify_by : list of str
-        Colonnes de data.obs utilisées pour définir les strata.
-        Ex: ["cellstates_tme", "histotype_label"]
-    n_target : int, optional
-        Nombre de cellules à garder PAR label dans `target_labels`.
-        Mutuellement exclusif avec `n_target_total`.
-    n_target_total : int, optional
-        Nombre TOTAL de cellules à garder pour l'ensemble des `target_labels`.
-        Mutuellement exclusif avec `n_target`.
-    variance_col : str, default "nCount_SCT"
-        Colonne obs utilisée comme proxy de variance pour l'allocation de Neyman.
-    label_col : str, default "celltype_label"
-        Colonne obs contenant les labels cibles.
-    seed : int, default 42
-        Graine pour la reproductibilité du sampling.
+    data : Objet AnnData source.
+    target_labels : Labels dans `label_col` à sous-échantillonner. Ex: ["Steroid cells", "T cells"]
+    stratify_by : Colonnes de data.obs utilisées pour définir les strata. Ex: ["cellstates_tme", "histotype_label"]
+    n_target : Nombre de cellules à garder PAR label dans `target_labels`. Mutuellement exclusif avec `n_target_total`.
+    n_target_total : Nombre TOTAL de cellules à garder pour l'ensemble des `target_labels`. Mutuellement exclusif avec `n_target`.
+    variance_col : Colonne obs utilisée comme proxy de variance pour l'allocation de Neyman.
+    label_col : Colonne obs contenant les labels cibles.
+    seed : Graine pour la reproductibilité du sampling.
 
     ValueError
         Si n_target et n_target_total sont tous les deux fournis ou absents,
@@ -131,6 +118,14 @@ def _run_neyman(
 ) -> None:
     """
     Effectue l'allocation de Neyman sur 'subset' et étend 'idx_keep' in-place pour qu'à la fin 'idx_keep' contienne toutes les cellules samplées (+ celles qu'on ne devait pas toucher)
+    
+    subset : Objet AnnData.
+    stratify_by : Colonnes de data.obs utilisées pour définir les strata. Ex: ["cellstates_tme", "histotype_label"]
+    n_target : Nombre de cellules à garder PAR label dans `target_labels`. Mutuellement exclusif avec `n_target_total`.
+    variance_col : Colonne obs utilisée comme proxy de variance pour l'allocation de Neyman.
+    target_labels : Labels dans `label_col` à sous-échantillonner. Ex: ["Steroid cells", "T cells"]
+    rng: générateur aléatoire pour le sampling.
+    idx_keep: index des cellules à ne pas toucher, s'agrandit au fur et à mesure de l'échantillonnage (car une cellule qui a choisi comme étant samplé ne doit plus être touché).
     """
     if n_target > len(subset):
         print(

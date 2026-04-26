@@ -3,7 +3,9 @@
 
 import os
 
+# NOMBRE DE CPUS A UTILISER EN PARALLELE
 N = 16
+
 os.environ["OMP_NUM_THREADS"] = str(N)
 os.environ["OPENBLAS_NUM_THREADS"] = str(N)
 os.environ["MKL_NUM_THREADS"] = str(N)
@@ -36,6 +38,7 @@ from scripts.studies_opt import (
 
 start_time_global = time.time()
 
+# CHEMIN DE SAUVEGARDE DES RESULTATS
 SAVE_DIR = "plots/myeloid"
 os.makedirs(SAVE_DIR, exist_ok=True)
 

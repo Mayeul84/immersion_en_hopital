@@ -15,21 +15,21 @@ import scipy
 from scipy.optimize import minimize_scalar
 
 # Ce script répertorie toutes les fonctions utiles ou nécessaires pour la clusterisation/partitionnement d'un jeu de données.
-
+# Elles sont faites pour éviter toutes répétitions dans le partitionnement (qui peut l'être très souvent) et s'assurer du bon formattage des données.
 
 def cluster_data(data,true_labels=None,n_neighbors=None,resolution=0.5,n_comps=100,random_state=None,show=True):
     """
-        Partitionne data.X (les données normalisées) selon l'algorithme de leiden de paramètres 'resolution' à partir du graphe de voisinages de paramètres ('resolution', 'n_comps').
-        La fonction retourne les labels assignés par le partionnement de leiden ainsi que les scores du partionnement vis à vis de 'true_labels' (la ground truth).
+    Partitionne data.X (les données normalisées) selon l'algorithme de leiden de paramètres 'resolution' à partir du graphe de voisinages de paramètres ('resolution', 'n_comps').
+    La fonction retourne les labels assignés par le partionnement de leiden ainsi que les scores du partionnement vis à vis de 'true_labels' (la ground truth).
 
-        data: objet scanpy (dataframe)
-        true_labels: list/array de labels. Un label est un entier entre 0 et n_class-1.
-        n_neighbors: nombre de plus proches voisins dans le graphe de k-NearestNeighbors (voir algorithme de Leiden). Si n_neighbors==None, alors le graphe de voisinage n'est pas actualisée
-            et le clustering de leiden s'effectue à partir de celui déjà enregistré dans 'data'. Si aucun n'est enregistré -> erreur.
-        resolution: paramètre de résolution de leiden.
-        n_comps: nombre de composantes de pca pour le calcul du graphe de voisinage.
-        random_state: seed de l'algorithme de leiden (l'algorithme est en partie aléatoire).
-        show: True alors on affiche la UMAP avec la ground truth et les nouveaux labels issus de leiden.
+    data: objet scanpy (dataframe)
+    true_labels: list/array de labels. Un label est un entier entre 0 et n_class-1.
+    n_neighbors: nombre de plus proches voisins dans le graphe de k-NearestNeighbors (voir algorithme de Leiden). Si n_neighbors==None, alors le graphe de voisinage n'est pas actualisée
+        et le clustering de leiden s'effectue à partir de celui déjà enregistré dans 'data'. Si aucun n'est enregistré -> erreur.
+    resolution: paramètre de résolution de leiden.
+    n_comps: nombre de composantes de pca pour le calcul du graphe de voisinage.
+    random_state: seed de l'algorithme de leiden (l'algorithme est en partie aléatoire).
+    show: True alors on affiche la UMAP avec la ground truth et les nouveaux labels issus de leiden.
     """
 
     # Si aucun random_state imposé, on en prend aléatoirement.
@@ -219,19 +219,19 @@ def find_best_resolution(data,true_labels,n_neighbors=15,n_trials=100,n_comps=10
 
 def best_leiden_run(data, true_labels, resolution, n_neighbors=None, n_comps=100, n_runs=50,score_key="ari",show=False):
     """
-        Partitionne data.X (les données normalisées) selon l'algorithme de leiden de paramètres 'resolution' à partir du graphe de voisinages de paramètres ('resolution', 'n_comps').
-        La fonction retourne les labels assignés par le meilleur partionnement de leiden trouvé sur 'n_runs' instances (l'algorithme de leiden est en partie aléatoire)
-        ainsi que les scores du partionnement vis à vis de 'true_labels' (la ground truth).
+    Partitionne data.X (les données normalisées) selon l'algorithme de leiden de paramètres 'resolution' à partir du graphe de voisinages de paramètres ('resolution', 'n_comps').
+    La fonction retourne les labels assignés par le meilleur partionnement de leiden trouvé sur 'n_runs' instances (l'algorithme de leiden est en partie aléatoire)
+    ainsi que les scores du partionnement vis à vis de 'true_labels' (la ground truth).
 
-        data: objet anndata/scanpy (dataframe)
-        true_labels: list/array de labels. Un label est un entier entre 0 et n_class-1.
-        resolution: paramètre de résolution de leiden.
-        n_neighbors: nombre de plus proches voisins dans le graphe de k-NearestNeighbors (voir algorithme de Leiden). Si n_neighbors==None, alors le graphe de voisinage n'est pas actualisée
-            et le clustering de leiden s'effectue à partir de celui déjà enregistré dans 'data'. Si aucun n'est enregistré -> erreur.
-        n_comps: nombre de composantes de pca pour le calcul du graphe de voisinage.
-        n_runs: nombre d'instances à lancer pour trouver le meilleur partitionnement
-        score_key: score sur lequel évaluer.
-        show: True alors on affiche la UMAP avec la ground truth et les nouveaux labels issus de leiden.
+    data: objet anndata/scanpy (dataframe)
+    true_labels: list/array de labels. Un label est un entier entre 0 et n_class-1.
+    resolution: paramètre de résolution de leiden.
+    n_neighbors: nombre de plus proches voisins dans le graphe de k-NearestNeighbors (voir algorithme de Leiden). Si n_neighbors==None, alors le graphe de voisinage n'est pas actualisée
+        et le clustering de leiden s'effectue à partir de celui déjà enregistré dans 'data'. Si aucun n'est enregistré -> erreur.
+    n_comps: nombre de composantes de pca pour le calcul du graphe de voisinage.
+    n_runs: nombre d'instances à lancer pour trouver le meilleur partitionnement
+    score_key: score sur lequel évaluer.
+    show: True alors on affiche la UMAP avec la ground truth et les nouveaux labels issus de leiden.
     """
     if n_neighbors is not None:
         sc.pp.neighbors(data, n_neighbors=n_neighbors)
@@ -258,18 +258,18 @@ def best_leiden_run(data, true_labels, resolution, n_neighbors=None, n_comps=100
 
 def average_leiden_run(data, true_labels, resolution, n_neighbors=None, n_comps=100, n_runs=50,show=False):
     """
-        Partitionne data.X (les données normalisées) selon l'algorithme de leiden de paramètres 'resolution' à partir du graphe de voisinages de paramètres ('resolution', 'n_comps').
-        La fonction retourne les labels assignés par un partionnement moyen de différents partitionnement leiden calculés 'n_runs' instances (l'algorithme de leiden est en partie aléatoire)
-        ainsi que les scores du partionnement vis à vis de 'true_labels' (la ground truth).
+    Partitionne data.X (les données normalisées) selon l'algorithme de leiden de paramètres 'resolution' à partir du graphe de voisinages de paramètres ('resolution', 'n_comps').
+    La fonction retourne les labels assignés par un partionnement moyen de différents partitionnement leiden calculés 'n_runs' instances (l'algorithme de leiden est en partie aléatoire)
+    ainsi que les scores du partionnement vis à vis de 'true_labels' (la ground truth).
 
-        data: objet anndata/scanpy (dataframe)
-        true_labels: list/array de labels. Un label est un entier entre 0 et n_class-1.
-        resolution: paramètre de résolution de leiden.
-        n_neighbors: nombre de plus proches voisins dans le graphe de k-NearestNeighbors (voir algorithme de Leiden). Si n_neighbors==None, alors le graphe de voisinage n'est pas actualisée
-            et le clustering de leiden s'effectue à partir de celui déjà enregistré dans 'data'. Si aucun n'est enregistré -> erreur.
-        n_comps: nombre de composantes de pca pour le calcul du graphe de voisinage.
-        n_runs: nombre d'instances à lancer pour trouver le meilleur partitionnement
-        show: True alors on affiche la UMAP avec la ground truth et les nouveaux labels issus de leiden.
+    data: objet anndata/scanpy (dataframe)
+    true_labels: list/array de labels. Un label est un entier entre 0 et n_class-1.
+    resolution: paramètre de résolution de leiden.
+    n_neighbors: nombre de plus proches voisins dans le graphe de k-NearestNeighbors (voir algorithme de Leiden). Si n_neighbors==None, alors le graphe de voisinage n'est pas actualisée
+        et le clustering de leiden s'effectue à partir de celui déjà enregistré dans 'data'. Si aucun n'est enregistré -> erreur.
+    n_comps: nombre de composantes de pca pour le calcul du graphe de voisinage.
+    n_runs: nombre d'instances à lancer pour trouver le meilleur partitionnement
+    show: True alors on affiche la UMAP avec la ground truth et les nouveaux labels issus de leiden.
     """
 
     # Calcul du graphe kNN ?

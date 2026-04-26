@@ -63,6 +63,9 @@ SUBSETS_CONFIG = {
 ANNDATA_MAP = {"all": "all.h5ad", "4principals": "4principals.h5ad", "No steroid": "nosteroid_cells.h5ad", "Myeloid cells": "myeloid_cells.h5ad", "Steroid cells": "steroid_cells.h5ad", "Fibroblasts": "fibroblast.h5ad", "Endothelial cells": "endothelial_cells.h5ad"}
 
 def format_time(seconds):
+    """
+    Convertit un temps en secondes en date.
+    """
     return str(datetime.timedelta(seconds=int(seconds)))
 
 def load_data(data_path):

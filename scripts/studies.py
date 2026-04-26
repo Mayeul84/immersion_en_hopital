@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from .gene_subsampling import thinning
 
+import scipy.sparse as sp
 from typing import List, Optional
 
 from .scoring import balanced_correctcells_score, compute_all_scores
@@ -52,7 +53,7 @@ def study_sparsity(cells, labels, ratio_candidates=None, n_runs=50, n_neighbors=
     for ratio in ratio_candidates:
         print(f"Ratio={ratio:.3f}")
 
-        # Thinning (ratio = 1 <=> pas de thinning)
+        # Thinning: ratio = 1 <=> pas de thinning (On applique le niveau de sparsité demandé)
         if(ratio < 1):
             thinned_cells = thinning(cells,reduction_ratio=ratio,same_reads=False,copy=True)
             thinned_cells = update_data(thinned_cells, n_neighbors=n_neighbors,n_comps=100,random_state=42,normalization=normalization)
@@ -154,12 +155,14 @@ def study_sparsity_stdthinning(cells, labels, ratio_candidates=None, n_runs=50, 
     v_history, v_std = [], []
     correct_history, correct_std = [], []
 
-    for ratio in ratio_candidates:
+    for ratio in ratio_candidates: # Pour un ratio
         print(f"Ratio={ratio:.3f}")
 
         h_runs, c_runs, v_runs, a_runs, ct_runs = [], [], [], [], []
 
-        for seed in range(n_runs): # La seule différence avec la fonction précédente (imbrication run et thinning)
+        for seed in range(n_runs): # Pour une run: La seule différence avec la fonction précédente (imbrication run et thinning)
+            
+            # Thinning (On applique le niveau de sparsité demandé)
             if ratio < 1:
                 thinned_cells = thinning(cells, reduction_ratio=ratio, same_reads=False, copy=True)
                 thinned_cells = update_data(thinned_cells, n_neighbors=n_neighbors, n_comps=100, random_state=np.random.randint(0, MAX_RNG_RANGE), normalization=normalization)
@@ -167,12 +170,15 @@ def study_sparsity_stdthinning(cells, labels, ratio_candidates=None, n_runs=50, 
                 thinned_cells = cells
                 thinned_cells = update_data(thinned_cells, n_neighbors=n_neighbors, n_comps=100, random_state=np.random.randint(0, MAX_RNG_RANGE), normalization=normalization)
 
+            # Trouver la meilleure résolution
             results = find_best_resolution(data=thinned_cells, true_labels=labels, n_neighbors=None, n_trials=50, method=search_resolution_method, show=False)
             resolution = results["resolution"]
 
+            # Partitionnement de Leiden
             sc.tl.leiden(thinned_cells, resolution=resolution, key_added='leiden_temp', random_state=np.random.randint(0, MAX_RNG_RANGE))
             leiden_labels = thinned_cells.obs['leiden_temp']
 
+            # Calcul des scores
             scores = compute_all_scores(true_labels=labels, cluster_labels=leiden_labels)
             h_runs.append(scores["homogeneity"])
             c_runs.append(scores["completness"])
@@ -180,13 +186,15 @@ def study_sparsity_stdthinning(cells, labels, ratio_candidates=None, n_runs=50, 
             a_runs.append(scores["ari"])
             ct_runs.append(scores["correct"])
 
+        # On enregistre moyenne et écart-type des scores
         homogeneity_history.append(np.mean(h_runs));  homogeneity_std.append(np.std(h_runs))
         completness_history.append(np.mean(c_runs));  completness_std.append(np.std(c_runs))
         ari_history.append(np.mean(a_runs));          ari_std.append(np.std(a_runs))
         v_history.append(np.mean(v_runs));            v_std.append(np.std(v_runs))
         correct_history.append(np.mean(ct_runs));     correct_std.append(np.std(ct_runs))
         print("\n")
-
+    
+    # Afficahge ?
     if show:
         if ax is None:
             _, ax = plt.subplots(figsize=(6, 5))
@@ -540,12 +548,14 @@ def study_group_sparsity(cells, labels, ratio_candidates=None, n_runs=50, n_neig
     v_history, v_std = {label: [] for label in pairs_key}, {label: [] for label in pairs_key}
     correct_history, correct_std = {label: [] for label in pairs_key}, {label: [] for label in pairs_key}
 
-    for ratio in ratio_candidates:
+    for ratio in ratio_candidates: # On évalue un ratio
         print(f"Ratio={ratio:.3f}")
 
         h_runs, c_runs, v_runs, a_runs, ct_runs = {label: [] for label in pairs_key}, {label: [] for label in pairs_key}, {label: [] for label in pairs_key}, {label: [] for label in pairs_key}, {label: [] for label in pairs_key}
 
-        for seed in range(n_runs):
+        for seed in range(n_runs): # Pour une run
+
+            # Thinning 
             if ratio < 1:
                 thinned_cells = thinning(cells, reduction_ratio=ratio, same_reads=False, copy=True)
                 thinned_cells = update_data(thinned_cells, n_neighbors=n_neighbors, n_comps=100, random_state=np.random.randint(0, MAX_RNG_RANGE), normalization=normalization)
@@ -553,9 +563,11 @@ def study_group_sparsity(cells, labels, ratio_candidates=None, n_runs=50, n_neig
                 thinned_cells = cells
                 thinned_cells = update_data(thinned_cells, n_neighbors=n_neighbors, n_comps=100, random_state=np.random.randint(0, MAX_RNG_RANGE), normalization=normalization)
 
+            # Recherche de la meilleure résolution
             results = find_best_resolution(data=thinned_cells, true_labels=labels, n_neighbors=None, n_trials=50, method=search_resolution_method, show=False)
             resolution = results["resolution"]
 
+            # Partitionnement (Leiden)
             sc.tl.leiden(thinned_cells, resolution=resolution, key_added='leiden_temp', random_state=np.random.randint(0, MAX_RNG_RANGE))
             leiden_labels = thinned_cells.obs['leiden_temp']
 
@@ -564,7 +576,8 @@ def study_group_sparsity(cells, labels, ratio_candidates=None, n_runs=50, n_neig
                 mask = (labels == label1) | (labels == label2) # masque
                 if mask.sum() == 0:
                     continue
-
+                
+                # Calcul des scores et enregistrement dans l'historique
                 scores = compute_all_scores(true_labels=labels[mask], cluster_labels=leiden_labels[mask]) # calcul des scores pour les sous-listes de labels
                 pair_key = f"{label1} vs {label2}"
                 h_runs[pair_key].append(scores["homogeneity"])
@@ -573,6 +586,7 @@ def study_group_sparsity(cells, labels, ratio_candidates=None, n_runs=50, n_neig
                 a_runs[pair_key].append(scores["ari"])
                 ct_runs[pair_key].append(scores["correct"])
 
+        # On moyenne sur les runs et on enregistre les résultats finaux
         for label in pairs_key:
             homogeneity_history[label].append(np.mean(h_runs[label]));  homogeneity_std[label].append(np.std(h_runs[label]))
             completness_history[label].append(np.mean(c_runs[label]));  completness_std[label].append(np.std(c_runs[label]))
@@ -597,6 +611,7 @@ def study_group_sparsity(cells, labels, ratio_candidates=None, n_runs=50, n_neig
             ax.plot(x, mean, color=color, linestyle=linestyle, label=label)
             ax.fill_between(x, mean - ci, mean + ci, color=color, alpha=0.15)
 
+        # Historique de scores avec moyenne et écart-type. (Selon les runs effectués)
         scores_history = [(homogeneity_history, homogeneity_std), (completness_history, completness_std), (correct_history, correct_std), (ari_history, ari_std), (v_history, v_std)]
         score_labels = ["homogeneity", "completness", "correctly classified cells", "ari", "v"]
 
@@ -868,3 +883,50 @@ def study_group_sparsity_exclude(cells, labels, ratio_candidates=None, n_runs=50
         "v": v_history,
         "correct": correct_history,
     }
+
+
+def compute_n_genes_sparsity(cells,ratio_candidates,show=True):
+    """
+    Calcul le nombre de gènes actifs moyens par cellules pour chaque niveau de sparsité figurant 'ratio_candidates', pour les deux méthodes de thinning
+    , c'est à dire thinning classic et thinning same reads (on rééchantillonne pour obtenir le même nombre de reads qu'initialement).
+    Retourne deux listes, la première correspond à thinning classic et la deuxième correspond à thinning same reads.
+
+    cells: objet anndata/scanpy (dataframe)
+    ratio_candidates: array/list de ratio de sparsité / niveau de sparsité candidats.
+    show: Si True on affiche l'évolution du nombre de gènes moyens par cellule suivant le niveau de sparsité.
+    """
+    n_genes_list = []
+    n_genes_same_reads_list = []
+
+
+    for ratio in ratio_candidates: # Niveau de sparsité étudié
+        print(f"Ratio={ratio:.3f}")
+
+        # Thinning 'classic'
+        thinned_cells = thinning(cells,reduction_ratio=ratio,same_reads=False,copy=False)
+        thinned_cells = update_data(thinned_cells)
+
+        # Thinning 'same reads' (rééchantillonnage pour obtenir le même nombre de reads qu'initialement)
+        thinned_cells_sr = thinning(cells,reduction_ratio=ratio,same_reads=True,copy=False)
+        thinned_cells_sr = update_data(thinned_cells_sr)
+        
+        # Calcul du nombre de gènes moyen par cellule pour Thinning 'classic'
+        n_genes_per_cell = (sp.csr_matrix.expm1(thinned_cells.raw.X) > 0).sum(axis=1)
+        n_genes_list.append(np.mean(n_genes_per_cell))
+
+        # Calcul du nombre de gènes moyen par cellule pour Thinning 'same reads'
+        n_genes_sr = (sp.csr_matrix.expm1(thinned_cells_sr.raw.X) > 0).sum(axis=1)
+        n_genes_same_reads_list.append(np.mean(n_genes_sr))
+        print("\n")
+
+    # Affichage ?    
+    if show:
+        plt.plot(ratio_candidates,n_genes_list,color="red",label="no-sr")
+        plt.plot(ratio_candidates,n_genes_same_reads_list,color="blue",label="sr")
+        plt.title(f"Genes per cell (Endothelial)")
+        plt.legend()
+        plt.xlabel("reduction ratio")
+        plt.ylabel("genes")
+        plt.show()
+    
+    return n_genes_list, n_genes_same_reads_list
