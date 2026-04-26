@@ -115,7 +115,7 @@ N = 16  # Nombre de CPUs à utiliser
 |-------------------|--------------------|---------------------|
 | Stéroïdes         | 133 501            | —                   |
 | **Myéloïdes**     | **16 698**         | Macrophages, TAM    |
-| **Endothéliales** | **8 540**          | —                   |
+| **Endothéliales** | **8 540**          | EC Venous, TEC2                   |
 | **Fibroblastes**  | **7 942**          | CAF, Résidents      |
 | Lymphoïdes        | 2 054              | —                   |
 | Chromaffines      | 192                | —                   |
@@ -126,7 +126,7 @@ Les types en gras sont les populations d'intérêt principal.
 
 ## Résultats principaux
 
-Seuils critiques d'homogénéité ($h = 0.4$) en niveau de sparsité et nombre moyen de gènes détectés par cellule, estimés sur 25 runs :
+*Seuils critiques d'homogénéité sur le partitionnement global d'un type donné ($h = 0.4$) en niveau de sparsité et nombre moyen de gènes détectés par cellule, estimés sur 25 runs.*
 
 | Type cellulaire   | $k=15$       | $k=25$       | $k=50$       | $k=100$      | $k=200$       |
 |-------------------|--------------|--------------|--------------|--------------|---------------|
@@ -134,8 +134,54 @@ Seuils critiques d'homogénéité ($h = 0.4$) en niveau de sparsité et nombre m
 | Fibroblastes      | 0.13 / 327   | 0.25 / 553   | 0.19 / 446   | 0.24 / 536   | 0.77 / 1160   |
 | Myéloïdes         | 0.19 / 446   | 0.25 / 553   | 0.20 / 465   | 0.19 / 446   | 0.22 / 501    |
 
+*Seuils critiques sur le partitionnement des sous-types pour une type donné (sparsité / nb gènes), h=0.4, k=20, 25 runs.*
+
+| Type & Sous-Type | Seuil critique (h=0.4) |
+|---|---|
+| **Fibroblastes** | |
+| &nbsp;&nbsp;&nbsp;&nbsp;CAF1 | 0.80 / 1311 |
+| &nbsp;&nbsp;&nbsp;&nbsp;CAF2 | 1.00 / 1484 |
+| &nbsp;&nbsp;&nbsp;&nbsp;CAF3 | 0.05 / 147 |
+| &nbsp;&nbsp;&nbsp;&nbsp;Resident fibroblasts 1 | 0.27 / 626 |
+| &nbsp;&nbsp;&nbsp;&nbsp;Resident fibroblasts 2 | 0.08 / 226 |
+| **Myéloïdes** | |
+| &nbsp;&nbsp;&nbsp;&nbsp;Inflammatory macrophages | 0.25 / 574 |
+| &nbsp;&nbsp;&nbsp;&nbsp;Residents macrophages 1 | 0.45 / 877 |
+| &nbsp;&nbsp;&nbsp;&nbsp;Residents macrophages 2 | 1.00 / 1389 |
+| &nbsp;&nbsp;&nbsp;&nbsp;TAM1 | 0.32 / 691 |
+| &nbsp;&nbsp;&nbsp;&nbsp;TAM2 | 1.00 / 1389 |
+
+*Seuils critiques par type sur le partitionnement des 4 grands types cellulaires (uniquement en sparsité), h=0.4, 25 runs.
+
+| Type cellulaire | k=20 |
+|---|---|
+| Stéroïdes | >> 0.25 |
+| Endothéliales | >> 0.25 ~ 0 |
+| Fibroblastes | 0.55 |
+| Myéloïdes | >> 0.25 ~ 0 |
+
 ---
 
 ## Données
 
 Les données ne sont pas incluses dans ce dépôt. Le jeu de données est un fichier AnnData (`.h5ad`) à placer selon le chemin défini dans `scripts/utils.py` (`DATA_PATH`).
+
+## Préparation des données
+
+Le jeu de données brut est au format `.RDS` (objet Seurat), **non lisible nativement par la bibliothèque Python `anndata`**. La conversion en `.h5ad` est donc obligatoire avant toute utilisation. Le script `convertToH5AD.R` effectue cette conversion :
+
+```r
+Rscript convertToH5AD.R
+```
+
+Modifier en tête de script :
+
+- `path` : le dossier contenant le fichier `.RDS`
+- `file_name` : le nom du fichier `.RDS`
+
+Le script requiert les packages R `Seurat`, `SeuratObject` et `SeuratDisk`. Il produit directement le fichier `single_cells.h5ad`.
+
+Ensuite :
+
+1. Dans `scripts/utils.py`, renseigner `PROJECT_PATH` avec le chemin racine du projet.
+2. Placer `single_cells.h5ad` dans le dossier `data/`.

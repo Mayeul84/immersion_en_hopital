@@ -31,11 +31,11 @@ from scripts.utils import check_data, preprocess_data, save_data, plot_UMAP, upd
 from scripts.utils import PROJECT_PATH, DATA_PATH, RESULTS_PATH, CELLTYPE_MAP, HISTOTYPE_MAP, ANNDATA_MAP, SUBSETS_CONFIG
 from scripts.gene_subsampling import neyman_subsample
 from scripts.clustering import cluster_data, find_best_resolution, find_best_resolution_linspace, best_leiden_run
-from studies_opt import (study_sparsity, study_sparsity_with_trajectories, 
+from scripts.studies_opt import (study_sparsity, study_sparsity_with_trajectories, 
                          study_complete_sparsity, study_group_sparsity, 
                          study_group_sparsity_exclude, study_group_sparsity_onevsall)
 
-SAVE_DIR = "plots/cell_types"
+SAVE_DIR = "plots_test/cell_types"
 os.makedirs(SAVE_DIR, exist_ok=True)
 
 print("="*50)
@@ -56,7 +56,7 @@ if cells is None:
 # ==========================================
 # 2. UNDERSAMPLING
 # ==========================================
-n_cells = 2e3
+n_cells = 2e2
 print(f"[2/3] Sampling {int(n_cells)} cellules...")
 cells = cells[cells.obs["celltype_label"].isin(["Steroid cells", "Fibroblasts", "Endothelial cells", "Myeloid cells"])]
 cells = neyman_subsample(data=cells, target_labels=["Steroid cells", "Fibroblasts", "Endothelial cells", "Myeloid cells"], label_col="celltype_label", stratify_by=["celltype_label"], n_target_total=int(n_cells))

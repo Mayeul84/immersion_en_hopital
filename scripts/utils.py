@@ -19,7 +19,7 @@ MAX_RNG_RANGE = 10000
 # Chemins d'accès
 
 ### Chemin principal
-PROJECT_PATH = r"C:\Users\mayeu\Desktop\TRAVAIL\MVA\Cours\Projet médecin" # A CHANGER, METTRE LE CHEMIN ACTUEL
+PROJECT_PATH = ... # A CHANGER, METTRE LE CHEMIN ACTUEL DU PROJET. Exemple: r"C:\Users\mayeu\Desktop\TRAVAIL\MVA\Cours\Projet médecin"
 
 ### Pour l'exportation
 RESULTS_PATH = PROJECT_PATH + r"\results"
