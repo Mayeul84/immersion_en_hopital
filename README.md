@@ -1,7 +1,7 @@
 # Impact de la sparsité sur l'informativité du transcriptome single-cell
 
 **Immersion en hôpital — MVA**  
-Mayeul Lambert & Céline Liu
+Céline Liu & Mayeul Lambert
 
 ---
 
@@ -133,7 +133,7 @@ Les types en gras sont les populations d'intérêt principal.
 | Fibroblastes      | 0.13 / 327   | 0.25 / 553   | 0.19 / 446   | 0.24 / 536   | 0.77 / 1160   |
 | Myéloïdes         | 0.19 / 446   | 0.25 / 553   | 0.20 / 465   | 0.19 / 446   | 0.22 / 501    |
 
-*Seuils critiques d'homogénéité sur le partitionnement global d'un type donné ($h = 0.4$) en niveau de sparsité et nombre moyen de gènes détectés par cellule, estimés sur 25 runs.*
+Seuils critiques d'homogénéité sur le partitionnement global d'un type donné ($h = 0.4$) en niveau de sparsité et nombre moyen de gènes détectés par cellule, estimés sur 25 runs.
 
 | Type & Sous-Type | Seuil critique (h=0.4) |
 |---|---|
@@ -150,7 +150,7 @@ Les types en gras sont les populations d'intérêt principal.
 | &nbsp;&nbsp;&nbsp;&nbsp;TAM1 | 0.32 / 691 |
 | &nbsp;&nbsp;&nbsp;&nbsp;TAM2 | 1.00 / 1389 |
 
-*Seuils critiques sur le partitionnement des sous-types pour une type donné (sparsité / nb gènes), h=0.4, k=20, 25 runs.*
+Seuils critiques sur le partitionnement des sous-types pour une type donné (sparsité / nb gènes), h=0.4, k=20, 25 runs.
 
 | Type cellulaire | k=20 |
 |---|---|
@@ -159,7 +159,7 @@ Les types en gras sont les populations d'intérêt principal.
 | Fibroblastes | 0.55 |
 | Myéloïdes | >> 0.25 ~ 0 |
 
-*Seuils critiques par type sur le partitionnement des 4 grands types cellulaires (uniquement en sparsité), h=0.4, 25 runs.*
+Seuils critiques par type sur le partitionnement des 4 grands types cellulaires (uniquement en sparsité), h=0.4, 25 runs. TODO: calculer les nombres de gènes équivalents
 
 ---
 
