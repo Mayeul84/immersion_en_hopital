@@ -1,0 +1,26 @@
+# core scientific
+numpy
+scipy
+pandas
+
+# single-cell
+scanpy
+anndata
+
+# machine learning
+scikit-learn
+
+# optimisation & hyperparameter search
+optuna
+
+# visualisation
+matplotlib
+
+# progress bars
+tqdm
+
+# parallelism
+joblib
+
+# system monitoring
+psutil
