@@ -1,16 +1,15 @@
-import numpy as np
-import scipy.sparse as sp
+import os
+import datetime
+
 import numpy as np
 import anndata as ad
 import scanpy as sc
-from collections import Counter
+import scipy.sparse as sp
 
 from sklearn.metrics import homogeneity_completeness_v_measure
 from sklearn.metrics import adjusted_rand_score
 
 import matplotlib.pyplot as plt
-import os
-from sklearn.metrics import confusion_matrix
 
 # Ce script répertorie toutes les petites fonctions utiles au projet mais qui ne sont pas le coeur du travail.
 
@@ -62,6 +61,9 @@ SUBSETS_CONFIG = {
 # IMPORTANT: Lien entre les sous-ensembles de types cellulaires étudiés et leur nom de fichier auquel ils sont ou seront enregistrés.
 ### all: le jeu de données complet, 4principals: les 4 principaux types cellulaires, No steroid: sans cellules stéroïdes, le reste est limpide.
 ANNDATA_MAP = {"all": "all.h5ad", "4principals": "4principals.h5ad", "No steroid": "nosteroid_cells.h5ad", "Myeloid cells": "myeloid_cells.h5ad", "Steroid cells": "steroid_cells.h5ad", "Fibroblasts": "fibroblast.h5ad", "Endothelial cells": "endothelial_cells.h5ad"}
+
+def format_time(seconds):
+    return str(datetime.timedelta(seconds=int(seconds)))
 
 def load_data(data_path):
     """

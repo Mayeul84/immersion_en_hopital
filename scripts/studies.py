@@ -10,7 +10,7 @@ from .gene_subsampling import thinning
 from typing import List, Optional
 
 from .scoring import balanced_correctcells_score, compute_all_scores
-from .utils import sctransform_manual, update_data
+from .utils import update_data
 from .utils import MAX_RNG_RANGE
 
 from .clustering import find_best_resolution, cluster_data, average_leiden_run, best_leiden_run

@@ -144,11 +144,13 @@ def _run_neyman(
         subset[stratify_by].astype(str).agg("__".join, axis=1)
     )
 
+    # Calcul de la std du proxy de variance par stratum
     stratum_stats = (
         subset.groupby("_stratum")[variance_col]
         .agg(["std", "count"])
         .rename(columns={"count": "n_stratum"})
     )
+    # Strata avec std=NaN (un seul élément) → on met std=0
     stratum_stats["std"] = stratum_stats["std"].fillna(0.0)
 
     # Poids de sampling
@@ -164,13 +166,16 @@ def _run_neyman(
             stratum_stats["weight"] / total_weight * n_target
         )
 
+    # Arrondi avec correction pour atteindre exactement n_target
     stratum_stats["allocation_int"] = np.floor(stratum_stats["allocation"]).astype(int)
     remainder = n_target - stratum_stats["allocation_int"].sum()
 
+    # On distribue le reste aux strata avec les plus grands résidus fractionnaires
     residuals = stratum_stats["allocation"] - stratum_stats["allocation_int"]
     top_idx = residuals.nlargest(int(remainder)).index
     stratum_stats.loc[top_idx, "allocation_int"] += 1
 
+    # Clamp : on ne peut pas sampler plus que ce qui existe dans un stratum
     stratum_stats["allocation_int"] = stratum_stats[
         ["allocation_int", "n_stratum"]
     ].min(axis=1)
