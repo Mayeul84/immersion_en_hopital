@@ -6,6 +6,8 @@ import anndata as ad
 import pandas as pd
 from typing import List
 
+# Ce script répertorie toutes les fonctions qui permettent de sous-échantillonner les gènes et/ou les cellules d'un jeu de données anndata.
+
 def neyman_subsample(
     data: ad.AnnData,
     target_labels: List[str],
@@ -18,11 +20,11 @@ def neyman_subsample(
 ) -> ad.AnnData:
     """
     Sous-échantillonne les cellules appartenant à certains labels de `label_col`
-    via une allocation de Neyman, stratifiée sur une ou plusieurs colonnes obs.
+    via une allocation de Neyman (On tire un certain nombre de samples proportionnellement à la variancede chaque strate), stratifiée sur une ou plusieurs colonnes obs.
     Les cellules hors `target_labels` sont conservées intégralement.
-
-    Parameters
-    ----------
+    Retourne un nouvel objet AnnData avec les cellules cibles sous-échantillonnées
+        et les autres cellules intactes.
+    
     data : AnnData
         Objet AnnData source.
     target_labels : list of str
@@ -44,14 +46,6 @@ def neyman_subsample(
     seed : int, default 42
         Graine pour la reproductibilité du sampling.
 
-    Returns
-    -------
-    AnnData
-        Nouvel objet AnnData avec les cellules cibles sous-échantillonnées
-        et les autres cellules intactes.
-
-    Raises
-    ------
     ValueError
         Si n_target et n_target_total sont tous les deux fournis ou absents,
         ou si un label de `target_labels` n'existe pas dans `label_col`,
@@ -59,7 +53,7 @@ def neyman_subsample(
         ou si `n_target`/`n_target_total` dépasse le nombre de cellules disponibles.
     """
 
-    # --- Validation n_target / n_target_total ---
+    # Validation n_target / n_target_total
     if (n_target is None) == (n_target_total is None):
         raise ValueError(
             "Exactly one of `n_target` or `n_target_total` must be provided."
@@ -68,7 +62,7 @@ def neyman_subsample(
     rng = np.random.default_rng(seed)
     obs = data.obs.copy()
 
-    # --- Validation des entrées ---
+    # Validation des entrées
     missing_labels = set(target_labels) - set(obs[label_col].unique())
     if missing_labels:
         raise ValueError(
@@ -89,11 +83,13 @@ def neyman_subsample(
             f"Colonnes disponibles: {list(obs.columns)}"
         )
 
-    # --- Indices des cellules NON cibles (conservées intégralement) ---
+    # Indices des cellules NON cibles (conservées intégralement)
+    # Lors du déroulement de l'algorithme idx_keep va s'extend pour contenir toutes les cellules restantes après notre subsampling
+    # (Voir la fonction _run_neyman)
     mask_non_target = ~obs[label_col].isin(target_labels)
     idx_keep = list(obs.index[mask_non_target])
 
-    # --- Résolution du n_target effectif ---
+    # Résolution du n_target effectif
     subset = obs.loc[obs[label_col].isin(target_labels)]
 
     if n_target_total is not None:
@@ -134,7 +130,7 @@ def _run_neyman(
     idx_keep: list,
 ) -> None:
     """
-    Effectue l'allocation de Neyman sur `subset` et étend `idx_keep` in-place.
+    Effectue l'allocation de Neyman sur 'subset' et étend 'idx_keep' in-place pour qu'à la fin 'idx_keep' contienne toutes les cellules samplées (+ celles qu'on ne devait pas toucher)
     """
     if n_target > len(subset):
         print(
@@ -155,9 +151,10 @@ def _run_neyman(
     )
     stratum_stats["std"] = stratum_stats["std"].fillna(0.0)
 
+    # Poids de sampling
     stratum_stats["weight"] = stratum_stats["n_stratum"] * stratum_stats["std"]
     total_weight = stratum_stats["weight"].sum()
-
+    
     if total_weight == 0:
         stratum_stats["allocation"] = (
             stratum_stats["n_stratum"] / stratum_stats["n_stratum"].sum() * n_target
@@ -178,6 +175,7 @@ def _run_neyman(
         ["allocation_int", "n_stratum"]
     ].min(axis=1)
 
+    # On extend idx_keep en lui donnant les nouvelles cellules samplées par strata
     for stratum_name, row in stratum_stats.iterrows():
         n_sample = int(row["allocation_int"])
         stratum_cells = subset.loc[subset["_stratum"] == stratum_name]
@@ -191,7 +189,15 @@ def _run_neyman(
 
 def thinning_novec(adata, reduction_ratio=0.25, same_reads=False, copy=True):
     """
-    Thinning + re-séquençage : même nombre de reads, η plus faible.
+    Thinning + re-séquençage : même nombre de reads. Le thinning s'applique seulement sur les données brutes.
+    Pour obtenir un tableau normalisé post thinning, il faudra passer ensuite sur la fonction 'update_data'.
+
+    Le thinning ne se fait pas vectoriellement (d'où le 'novec'). Moins efficace.
+
+    adata: objet Anndata/Scanpy
+    reduction_ratio: le ratio de sparsité i.e la probabilité à laquelle on pioche un read.
+    same_reads: on force le tableau à avoir le même nombre de reads.
+    copy: artefact de code
     """        
     
     X = adata.raw.X.expm1().copy() if hasattr(adata.X, 'toarray') else np.expm1(adata.raw.X).copy()
@@ -216,9 +222,11 @@ def thinning_novec(adata, reduction_ratio=0.25, same_reads=False, copy=True):
         else:
             X_new[c,cols_indices] = Y
     
+    # On efface les objets inutiles
     del X
     del Y
 
+    # Nouvelle donnée brute
     for i in range(len(X_new.data)):
         X_new.data[i] = np.log1p(X_new.data[i]).tolist()
 
@@ -236,16 +244,25 @@ def thinning_novec(adata, reduction_ratio=0.25, same_reads=False, copy=True):
 
 
 def thinning(adata, reduction_ratio=0.25, same_reads=False, copy=True):
+    """
+    Thinning + re-séquençage : même nombre de reads. Le thinning s'applique seulement sur les données brutes.
+    Pour obtenir un tableau normalisé post thinning, il faudra passer ensuite sur la fonction 'update_data'.
+
+    adata: objet Anndata/Scanpy
+    reduction_ratio: le ratio de sparsité i.e la probabilité à laquelle on pioche un read.
+    same_reads: on force le tableau à avoir le même nombre de reads.
+    copy: artefact de code
+    """      
 
     X = adata.raw.X.copy()
     if not sp.issparse(X):
         X = sp.csr_matrix(X)
     X = X.tocsr()
 
-    # Inverser log1p → counts bruts
+    # Inverser log1p (counts bruts)
     X.data = np.expm1(X.data)
 
-    # ---- Thinning vectorisé ----
+    # Thinning vectorisé
     # Binomial sur tous les non-zéros d'un coup
     X_new = X.copy()
     X_new.data = np.random.binomial(
@@ -254,7 +271,7 @@ def thinning(adata, reduction_ratio=0.25, same_reads=False, copy=True):
     ).astype(X.data.dtype)
 
     if same_reads:
-        # Re-séquençage par cellule — difficile à vectoriser complètement
+        # Re-séquençage par cellule, difficile à vectoriser complètement
         # mais on évite les conversions dense
         X_new = X_new.tolil()
         for c in range(X.shape[0]):

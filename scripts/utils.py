@@ -12,15 +12,27 @@ import matplotlib.pyplot as plt
 import os
 from sklearn.metrics import confusion_matrix
 
+# Ce script répertorie toutes les petites fonctions utiles au projet mais qui ne sont pas le coeur du travail.
+
+# Etat aléatoirement maximale dans les algorithmes de générations de nombres aléatories.
 MAX_RNG_RANGE = 10000
 
+# Chemins d'accès
+
+### Chemin principal
 PROJECT_PATH = r"C:\Users\mayeu\Desktop\TRAVAIL\MVA\Cours\Projet médecin" # A CHANGER, METTRE LE CHEMIN ACTUEL
+
+### Pour l'exportation
 RESULTS_PATH = PROJECT_PATH + r"\results"
 FIGURES_PATH = RESULTS_PATH + r"\figures"
+
+### Pour charger et exporter les données .h5ad
 DATA_PATH = PROJECT_PATH + r"\data"
 
+### Jeu de données originel (au format .h5ad)
 SINGLE_CELLS_PATH = DATA_PATH + r"\single_cells.h5ad"
 
+# Lien entre les labels numériques et labels textuelles (pour rendre le jeu de données plus interprétable)
 CELLTYPE_MAP = {
     0: 'Steroid cells',
     1: 'Chromaffin cells',
@@ -30,6 +42,7 @@ CELLTYPE_MAP = {
     5: 'Lymphoid cells'
 }
 
+# Lien entre les labels numériques et labels textuelles (pour rendre le jeu de données plus interprétable)
 HISTOTYPE_MAP = {
     0: 'ACC C1A',
     1: 'ACC C1B',
@@ -38,7 +51,7 @@ HISTOTYPE_MAP = {
     4: 'Normal'
 }
 
-### Relevant subset to study
+# Sous-ensemble de types cellulaires intéressants à étudier (fourni par Anne)
 SUBSETS_CONFIG = {
     "Steroid cells":    {'labels': ['ACC C1A', 'ACC C1B', 'ACA', 'PBMAH', 'Normal'], 'col': 'histotype_label'},
     "Endothelial cells": {'labels': ['TEC2', 'EC-venous'], 'col': 'cellstates_tme'},
@@ -46,9 +59,16 @@ SUBSETS_CONFIG = {
     "Myeloid cells": {'labels': ['TAM1', 'TAM2', 'Inflammatory macrophages', 'Resident macrophages 1', 'Resident macrophages 2'], 'col': 'cellstates_tme'}
 }
 
+# IMPORTANT: Lien entre les sous-ensembles de types cellulaires étudiés et leur nom de fichier auquel ils sont ou seront enregistrés.
+### all: le jeu de données complet, 4principals: les 4 principaux types cellulaires, No steroid: sans cellules stéroïdes, le reste est limpide.
 ANNDATA_MAP = {"all": "all.h5ad", "4principals": "4principals.h5ad", "No steroid": "nosteroid_cells.h5ad", "Myeloid cells": "myeloid_cells.h5ad", "Steroid cells": "steroid_cells.h5ad", "Fibroblasts": "fibroblast.h5ad", "Endothelial cells": "endothelial_cells.h5ad"}
 
 def load_data(data_path):
+    """
+    Charger la donnée situé au chemin 'data_path'.
+
+    Retourne un dataframe anndata.
+    """
     data = sc.read_h5ad(data_path)    
     if data.raw is not None and "_index" in data.raw.var.columns:
         data.raw.var.rename(columns={"_index": "gene_index"}, inplace=True)
@@ -56,31 +76,58 @@ def load_data(data_path):
     return data
 
 def check_data(celltype,data_path=DATA_PATH):
+    """
+    Vérifier si le 'celltype' sélectionné a son propre dataframe (filtre du dataframe de base) enregistré en local au format .h5ad.
+    Retourne le dataframe s'il existe, sinon renvoie None.
 
+    On enregistre des sous-dataframes du dataframe initial afin de ne pas avoir à le recharger complètement systématiquement (coûteux en mémoire)
+
+    celltype: str, nom du type cellulaire choisi.
+    data_path: str, chemin vers un dossier de dataframes anndata au format .h5ad.
+    """
+
+    # Le lien entre 'celltype' et le nom du fichier .h5ad est fait par ANNDATA_MAP
     file_to_find = ANNDATA_MAP[celltype]
     
     files = [f for f in os.listdir(data_path) if f.endswith(".h5ad")]
 
+    # Existe-t-il ?
     if file_to_find in files:
         return load_data(f"{data_path}\\{file_to_find}")
     else:
         return None
     
 def save_data(data, data_path=f"{DATA_PATH}\\data.h5ad"):
+    """
+    Sauvegarde la 'data' au format .h5ad au chemin 'data_path'.
+    """
+
+    # Création de la colonne 'gene_index' dans le tableau de données brutes (important)
     if data.raw is not None and "_index" in data.raw.var.columns:
         data.raw.var.rename(columns={"_index": "gene_index"}, inplace=True)
 
+    # Export
     data.write_h5ad(data_path, compression="gzip")
 
 def preprocess_data(celltype="Steroid cells", with_subsets_config=False, n_neighbors=15, n_comps=100, random_state=42, verbose=False):
+    """
+    Preprocessing du jeu de données originale. Selon, le sous ensemble 'celltype' de types cellulaires sélectionné, on construit un sous-dataframe anndata.
+
+    celltype: str, nom du sous-ensemble de type cellulaires.
+    with_subsets_config: Si True, alors on filtre aussi sur le sous-ensemble de types cellulaires qu'Anne a indiqué.
+    n_neighbors: pour le graphe kNN, dans l'actualisation du jeu de données.
+    n_comps: nombre de composantes PCA,
+    random_state: seed pour calculs aléatoires
+    """
     data = ad.read_h5ad(SINGLE_CELLS_PATH,backed="r")
     if data.raw is not None and "_index" in data.raw.var.columns:
         data.raw.var.rename(columns={"_index": "gene_index"}, inplace=True)
 
+    # On renomme les colonnes pour que la donnée soit mieux interprétable.
     data.obs['celltype_label'] = data.obs['celltype'].map(CELLTYPE_MAP).astype('category')
     data.obs['histotype_label'] = data.obs['histotype'].map(HISTOTYPE_MAP).astype('category')
     
-
+    # Quel sous-ensemble de types cellulaires ?
     if celltype == "all":
         data = data.to_memory()
         return data
@@ -90,14 +137,19 @@ def preprocess_data(celltype="Steroid cells", with_subsets_config=False, n_neigh
         mask = data.obs["celltype_label"].isin(["Steroid cells", "Myeloid cells", "Fibroblasts", "Endothelial cells"])
     else:
         mask = data.obs["celltype_label"] == celltype
-        if with_subsets_config:
-            mask = mask & (data.obs[SUBSETS_CONFIG[celltype]['col']].isin(SUBSETS_CONFIG[celltype]['labels']))
+
+    # Filtrage supplémentaire de types cellulaires qu'Anne a indiqué
+    if with_subsets_config:
+        mask = mask & (data.obs[SUBSETS_CONFIG[celltype]['col']].isin(SUBSETS_CONFIG[celltype]['labels']))
 
     data = data[mask]
     data = data.to_memory()
+
+    # Suprression de données inutiles et lourdes.
     del data.obsm
     del data.obsp
 
+    # Actualisation du jeu de données normalisées.
     data = update_data(data, n_neighbors=n_neighbors, n_comps=n_comps, random_state=random_state, verbose=verbose)
 
     return data
@@ -230,7 +282,15 @@ def sctransform_manual(adata, n_cells=5000, n_genes=2000, clip_range=None,verbos
 
 def update_data(data,n_neighbors=15,n_comps=100,var_names="X",random_state=42, normalization="sct",verbose=False):
     """
-    En place
+    Actualisation du jeu de données normalisées.
+    Lorsqu'on modifie le tableau de données brutes (accessibles via data.raw.X), les données normalisées (accessibles via data.X) ne sont pas modifiées en conséquence.
+    Pour que cela le soit, il faut appeler cette fonction.
+
+    data: objet anndata/scanpy (dataframe)
+    n_neighbors: pour le graphe kNN, dans l'actualisation du jeu de données.
+    n_comps: nombre de composantes PCA
+    var_names: où trouver le nom des gènes ?
+    normalization: méthode de normalisation appliquée (par défaut "sct"). Possibilités: "sct", "log1p".
     """
 
     if var_names=="raw":
@@ -270,6 +330,13 @@ def update_data(data,n_neighbors=15,n_comps=100,var_names="X",random_state=42, n
     return data
 
 def plot_UMAP(data,save_path=None):
+    """
+    Affichage de la UMAP selon les étiquettes originales.
+    'data' doit avoir tous les objets nécessaires à la réalisation de la UMAP déjà calculés.s
+
+    data: objet anndata/scanpy (dataframe)
+    save_path: str, chemin auquel enregistré la figure. Si None, pas de sauvegarde.
+    """
 
     data.obs['celltype_label'] = data.obs['celltype'].map(CELLTYPE_MAP).astype('category')
     data.obs['histotype_label'] = data.obs['histotype'].map(HISTOTYPE_MAP).astype('category')
@@ -310,6 +377,14 @@ def plot_UMAP(data,save_path=None):
 
 
 def plot_custom_UMAP(data,labels,save_path=None):
+    """
+    Affichage de la UMAP selon les étiquettes originales et des étiquettes custom données via 'labels'.
+    'data' doit avoir tous les objets nécessaires à la réalisation de la UMAP déjà calculés.
+
+    data: objet anndata/scanpy (dataframe)
+    labels: array/list de labels.
+    save_path: str, chemin auquel enregistré la figure. Si None, pas de sauvegarde.
+    """
 
     data.obs['celltype_label'] = data.obs['celltype'].map(CELLTYPE_MAP).astype('category')
     data.obs['histotype_label'] = data.obs['histotype'].map(HISTOTYPE_MAP).astype('category')
@@ -366,22 +441,34 @@ def plot_new_UMAP(
     use_rep=None,
     random_state=0
 ):
-    # ---- labels (identique à ta fonction d'origine) ----
+    """
+    Calcul et affichage de la UMAP selon les étiquettes originales et des étiquettes custom données via 'labels'.
+
+    data: objet anndata/scanpy (dataframe)
+    overwrite: Si True alors les calculs de UMAP écrasent les données relatives à UMAP enregistrées dans 'data'.
+    save_path: str, chemin auquel enregistré la figure. Si None, pas de sauvegarde.
+    n_comps: nombre de composantes PCA (PCA nécessaire pour UMAP)
+    n_neighbors: nombre de voisins pour le graphe kNN (graphe kNN nécessaire pour UMAP)
+    n_pcs: nombre de composantes PCA utilisé pour le graphe kNN.
+    use_rep: quelle représentation ? Par défaut, la PCA.
+    random_state: seed pour calculs aléatoires
+    """
+
     data.obs['celltype_label'] = data.obs['celltype'].map(CELLTYPE_MAP).astype('category')
     data.obs['histotype_label'] = data.obs['histotype'].map(HISTOTYPE_MAP).astype('category')
 
-    # ---- récupérer paramètres sauvegardés si non fournis ----
+    # récupérer paramètres sauvegardés si non fournis
     neighbors_params = data.uns.get('neighbors', {}).get('params', {})
     final_n_neighbors = n_neighbors if n_neighbors is not None else neighbors_params.get('n_neighbors', 15)
     final_n_pcs = n_pcs if n_pcs is not None else neighbors_params.get('n_pcs')
     final_use_rep = use_rep if use_rep is not None else neighbors_params.get('use_rep')
 
-    # ---- sauvegarde éventuelle de l'UMAP existante ----
+    # sauvegarde éventuelle de l'UMAP existante
     umap_backup = None
     if not overwrite and 'X_umap' in data.obsm:
         umap_backup = data.obsm['X_umap'].copy()
 
-    # ---- recalcul TOUJOURS ----
+    # recalcul TOUJOURS
     sc.tl.pca(data, n_comps=n_comps)
     sc.pp.neighbors(
         data,
@@ -392,14 +479,14 @@ def plot_new_UMAP(
 
     sc.tl.umap(data, random_state=random_state)
 
-    # ---- gestion sauvegarde figure ----
+    # gestion sauvegarde figure
     if save_path:
         full_path = os.path.join(FIGURES_PATH, save_path)
         os.makedirs(os.path.dirname(full_path), exist_ok=True)
         sc.settings.figdir = os.path.dirname(full_path)
         sc.settings.set_figure_params(dpi=300, format='pdf')
 
-    # ---- affichage (identique à ta fonction) ----
+    # affichage (identique à ta fonction)
     sc.pl.umap(
         data,
         color=['celltype_label', 'histotype_label', 'cellstates_tme'],
@@ -413,7 +500,7 @@ def plot_new_UMAP(
 
     plt.show()
 
-    # ---- restauration si overwrite=False ----
+    # restauration si overwrite=False
     if not overwrite:
         if umap_backup is not None:
             data.obsm['X_umap'] = umap_backup
@@ -434,18 +521,33 @@ def gridsearch_leiden(
     n_runs=5,
     random_state=0
 ):
+    """
+    Quadrille l'espace (n_neighbors,resolution) à partir des deux grids 'neighbors_grid' et 'resolution_grid'
+    et calcule les scores de partitionnement de 'data' en chaque point (n_neighbors,resolution).
+
+    adata: objet anndata/scanpy (dataframe)
+    true_key: nom de la colonne de adata qui correspond aux labels considérés comme ground truth. (Exemple: celltype_label)
+    neighbors_grid: grille de neighbors candidats
+    resolution_grid: grille de résolution candidates
+    n_pcs: nombre de composantes PCA utilisé pour le graphe kNN.
+    n_runs: nombre d'instances à lancer pour moyenner les scores de partitionnement.
+    random_state: seed pour calculs aléatoires
+    """
     
     true_labels = adata.obs[true_key]
     results = []
     
     for k in neighbors_grid:
+        # Parcours n_neighbors
         sc.pp.neighbors(adata, n_neighbors=k, n_pcs=n_pcs)
         
         for res in resolution_grid:
+            # Parcours resolution
             
             v_scores = []
             ari_scores = []
             
+            # runs sur lesquels on moyennera les scores
             for seed in range(n_runs):
                 sc.tl.leiden(
                     adata,
@@ -465,7 +567,7 @@ def gridsearch_leiden(
             results.append({
                 "k": k,
                 "resolution": res,
-                "V_mean": np.mean(v_scores),
+                "V_mean": np.mean(v_scores), # moyennes des scores suivant les runs
                 "ARI_mean": np.mean(ari_scores),
                 "V_std": np.std(v_scores),
                 "ARI_std": np.std(ari_scores),

@@ -15,8 +15,27 @@ from .utils import MAX_RNG_RANGE
 
 from .clustering import find_best_resolution, cluster_data, average_leiden_run, best_leiden_run
 
-def study_sparsity(cells, labels, ratio_candidates=None, n_runs=50, n_neighbors=15, normalization="sct", search_resolution_method="optuna",stats="average",show=False, ax=None, legend=True):
+# Ce script est le coeur du projet. Il répertorie toutes les fonctions qui lanceront les études précises que nous avons faites sur le jeu de données.
+# Il répertorie toutes les fonctions d'études de la qualité des partitionnements lorsque la sparsité du jeu de données évolue.
 
+def study_sparsity(cells, labels, ratio_candidates=None, n_runs=50, n_neighbors=15, normalization="sct", search_resolution_method="optuna",stats="average",show=False, ax=None, legend=True):
+    """
+    Lance une étude de la sparsité sur le anndata 'cells' à partir des 'labels' ground truth.
+    On calcule les scores de chaque ratio candidat figurant dans 'ratio_candidates'.
+    Retourne les historiques de scores globaux.
+
+    cells: objet anndata/scanpy (dataframe)
+    labels: list/array des labels ground truth. Un label est un entier entre 0 et n_class-1.
+    ratio_candidates: list/array des ratio de sparsité candidats.
+    n_neighbors: nombre de plus proches voisins dans le graphe de k-NearestNeighbors (voir algorithme de Leiden).
+    n_runs: nombre d'instances à lancer pour trouver le meilleur partitionnement
+    normalization: choix de la normalisation des données brutes. Par défaut, normalisation SCT.
+    search_resolution_method: choix de la méthode d'optimisation pour trouver la meilleure résolution de leiden
+    stats: manière d'obtenir le partitionnement de leiden après 'n_runs'. Choix: 'average' ou 'highest'.
+    show: True alors on affiche l'évolution des scores selon le ratio de sparsité.
+    ax: objet de dessin matplotlib 
+    legend: True alors on affiche la légende sur le graphique.
+    """
     if ratio_candidates is None:
         ratio_candidates = np.linspace(0.01,1,20)
 
@@ -29,8 +48,11 @@ def study_sparsity(cells, labels, ratio_candidates=None, n_runs=50, n_neighbors=
     v_history, v_std = [], []
     correct_history, correct_std = [], []
 
+    # Calcul des scores pour chaque ratio candidat
     for ratio in ratio_candidates:
         print(f"Ratio={ratio:.3f}")
+
+        # Thinning (ratio = 1 <=> pas de thinning)
         if(ratio < 1):
             thinned_cells = thinning(cells,reduction_ratio=ratio,same_reads=False,copy=True)
             thinned_cells = update_data(thinned_cells, n_neighbors=n_neighbors,n_comps=100,random_state=42,normalization=normalization)
@@ -38,9 +60,11 @@ def study_sparsity(cells, labels, ratio_candidates=None, n_runs=50, n_neighbors=
             thinned_cells = cells
             thinned_cells = update_data(thinned_cells, n_neighbors=n_neighbors,n_comps=100,random_state=42,normalization=normalization)
 
+        # Trouver la meilleure résolution
         results = find_best_resolution(data=thinned_cells,true_labels=labels,n_neighbors=None,n_trials=50,method=search_resolution_method,show=False)
         resolution = results["resolution"]
 
+        # Comment est obtenu le partionnement final de leiden (issu de 'n_runs' partitionnements) ?
         if stats=="average":
             output = average_leiden_run(data=thinned_cells,true_labels=labels,n_runs=n_runs,resolution=resolution,show=False)
             scores = output["scores"]
@@ -56,12 +80,16 @@ def study_sparsity(cells, labels, ratio_candidates=None, n_runs=50, n_neighbors=
             homogeneity_history.append(scores["homogeneity"]),completness_history.append(scores["completness"]),ari_history.append(scores["ari"]),v_history.append(scores["v"]),correct_history.append(scores["correct"])
             homogeneity_std.append(0),completness_std.append(0),ari_std.append(0),v_std.append(0),correct_std.append(0)
 
+    # Affichage ?
     if show:
+        
+        # Utilise-t-on un plot déjà initialisé ?
         if ax is None:
             _, ax = plt.subplots(figsize=(6,5))
 
         r = ratio_candidates
 
+        # Affichage de la courbe + intervalle de confiance autour de chaque point.
         def plot_with_band(x, mean, std, color, label, linestyle="-"):
             mean, std = np.array(mean), np.array(std)
             ci = 1.96 * std / np.sqrt(n_runs)  # intervalle de confiance à 95%
@@ -78,6 +106,8 @@ def study_sparsity(cells, labels, ratio_candidates=None, n_runs=50, n_neighbors=
 
         ax.invert_xaxis()
         ax.set_title(f"k={n_neighbors}")
+
+        # Légende ?
         if legend:
             ax.legend()
         ax.grid(True,alpha=0.6)
@@ -93,7 +123,25 @@ def study_sparsity(cells, labels, ratio_candidates=None, n_runs=50, n_neighbors=
     }
 
 def study_sparsity_stdthinning(cells, labels, ratio_candidates=None, n_runs=50, n_neighbors=15, normalization="sct", search_resolution_method="optuna", show=False, ax=None, legend=True):
+    """
+    Lance une étude de la sparsité sur le anndata 'cells' à partir des 'labels' ground truth.
+    On calcule les scores de chaque ratio candidat figurant dans 'ratio_candidates'.
+    Retourne les historiques de scores globaux.
 
+    Le thinning est appliqué de nouveau à chaque run, de sorte à prendre en compte la variance due à la méthode de thinning.
+
+    cells: objet anndata/scanpy (dataframe)
+    labels: list/array des labels ground truth. Un label est un entier entre 0 et n_class-1.
+    ratio_candidates: list/array des ratio de sparsité candidats.
+    n_neighbors: nombre de plus proches voisins dans le graphe de k-NearestNeighbors (voir algorithme de Leiden).
+    n_runs: nombre d'instances à lancer pour trouver le meilleur partitionnement
+    normalization: choix de la normalisation des données brutes. Par défaut, normalisation SCT.
+    search_resolution_method: choix de la méthode d'optimisation pour trouver la meilleure résolution de leiden
+    stats: manière d'obtenir le partitionnement de leiden après 'n_runs'. Choix: 'average' ou 'highest'.
+    show: True alors on affiche l'évolution des scores selon le ratio de sparsité.
+    ax: objet de dessin matplotlib 
+    legend: True alors on affiche la légende sur le graphique.
+    """
     if ratio_candidates is None:
         ratio_candidates = np.linspace(0.01, 1, 20)
 
@@ -111,7 +159,7 @@ def study_sparsity_stdthinning(cells, labels, ratio_candidates=None, n_runs=50, 
 
         h_runs, c_runs, v_runs, a_runs, ct_runs = [], [], [], [], []
 
-        for seed in range(n_runs):
+        for seed in range(n_runs): # La seule différence avec la fonction précédente (imbrication run et thinning)
             if ratio < 1:
                 thinned_cells = thinning(cells, reduction_ratio=ratio, same_reads=False, copy=True)
                 thinned_cells = update_data(thinned_cells, n_neighbors=n_neighbors, n_comps=100, random_state=np.random.randint(0, MAX_RNG_RANGE), normalization=normalization)
@@ -174,7 +222,21 @@ def study_sparsity_stdthinning(cells, labels, ratio_candidates=None, n_runs=50, 
     }
 
 def study_sparsity_with_trajectories(cells, labels, ratio_candidates=None, n_runs=50, n_neighbors=15, normalization="sct", search_resolution_method="optuna", show=False, ax=None):
+    """
+    Lance une étude de la sparsité sur le anndata 'cells' à partir des 'labels' ground truth.
+    On calcule les scores de chaque ratio candidat figurant dans 'ratio_candidates'.
+    Retourne les historiques de scores par partitionnement de leiden (au total 'n_runs')
 
+    cells: objet anndata/scanpy (dataframe)
+    labels: list/array des labels ground truth. Un label est un entier entre 0 et n_class-1.
+    ratio_candidates: list/array des ratio de sparsité candidats.
+    n_runs: nombre d'instances à lancer pour trouver le meilleur partitionnement
+    n_neighbors: nombre de plus proches voisins dans le graphe de k-NearestNeighbors (voir algorithme de Leiden).
+    normalization: choix de la normalisation des données brutes. Par défaut, normalisation SCT.
+    search_resolution_method: choix de la méthode d'optimisation pour trouver la meilleure résolution de leiden
+    show: True alors on affiche l'évolution des scores selon le ratio de sparsité.
+    ax: objet de dessin matplotlib 
+    """
     if ratio_candidates is None:
         ratio_candidates = np.linspace(0.01,1,20)
 
@@ -202,6 +264,7 @@ def study_sparsity_with_trajectories(cells, labels, ratio_candidates=None, n_run
         results = find_best_resolution(data=thinned_cells,true_labels=labels,n_neighbors=None,n_trials=50,method=search_resolution_method,show=False)
         resolution = results["resolution"]
 
+        # Cette fois-ci on conserve les scores de chaque run
         for seed in range(n_runs):
             sc.tl.leiden(thinned_cells,resolution=resolution,key_added='leiden_temp', random_state=np.random.randint(0, MAX_RNG_RANGE))
             leiden_labels = thinned_cells.obs['leiden_temp']
@@ -262,10 +325,24 @@ def study_sparsity_with_trajectories(cells, labels, ratio_candidates=None, n_run
     }
 
 def study_complete_sparsity(cells, labels, ratio_candidates=None, n_runs=50, n_neighbors_candidates=None, search_resolution_method="optuna",stats="average", runs_on_thinning=True, show=False):
-    
+    """
+    Lance une étude de la sparsité sur le anndata 'cells' à partir des 'labels' ground truth pour chaque n_neighbors de 'n_neighbors_candidates'
+    On calcule les scores de chaque ratio candidat figurant dans 'ratio_candidates'.
+    Retourne les historiques de scores globaux pour chaque n_neighbors de 'n_neighbors_candidates'.
+
+    cells: objet anndata/scanpy (dataframe)
+    labels: list/array des labels ground truth. Un label est un entier entre 0 et n_class-1.
+    n_runs: nombre d'instances à lancer pour trouver le meilleur partitionnement
+    n_neighbors: nombre de plus proches voisins dans le graphe de k-NearestNeighbors (voir algorithme de Leiden).
+    search_resolution_method: choix de la méthode d'optimisation pour trouver la meilleure résolution de leiden
+    stats: manière d'obtenir le partitionnement de leiden après 'n_runs'. Choix: 'average' ou 'highest'.
+    runs_on_thinning: Si True alors le thinning se fera à chaque run de Leiden plutôt qu'en amont des runs.
+    show: True alors on affiche l'évolution des scores selon le ratio de sparsité.
+    """
     if n_neighbors_candidates is None:
         n_neighbors_candidates = [15,50,100,200]
 
+    # Affichage ?
     if show:
         n = len(n_neighbors_candidates)
         n_cols = int(np.ceil(np.sqrt(n)))
@@ -274,8 +351,11 @@ def study_complete_sparsity(cells, labels, ratio_candidates=None, n_runs=50, n_n
         axs = axs.flatten()
 
     scores_history = {}
+
+    # Lancement d'une étude de sparsité pour chaque n_neighbors candidat.
     for i, n_neighbors in enumerate(n_neighbors_candidates):
 
+        # Variance thinning ou non?
         if runs_on_thinning:
             k_scores = study_sparsity_stdthinning(cells=cells,labels=labels,ratio_candidates=ratio_candidates,n_runs=n_runs,n_neighbors=n_neighbors,search_resolution_method=search_resolution_method,show=show,ax=axs[i],legend=False)
         else:
@@ -285,6 +365,7 @@ def study_complete_sparsity(cells, labels, ratio_candidates=None, n_runs=50, n_n
         if show:
             axs[i].set_title(f"k={n_neighbors}")
 
+    # Suite de l'affichage (si affichage)
     if show:
         for j in range(i + 1, len(axs)):
             axs[j].set_visible(False)
@@ -307,121 +388,139 @@ def study_complete_sparsity(cells, labels, ratio_candidates=None, n_runs=50, n_n
     return scores_history
 
 
-def study_group_sparsity_nostdthinning(cells, labels, ratio_candidates=None, n_runs=50, n_neighbors=15, normalization="sct", search_resolution_method="optuna", stats="average", show=False):
-    from itertools import combinations
+# def study_group_sparsity_nostdthinning(cells, labels, ratio_candidates=None, n_runs=50, n_neighbors=15, normalization="sct", search_resolution_method="optuna", stats="average", show=False):
+#     from itertools import combinations
 
-    if ratio_candidates is None:
-        ratio_candidates = np.linspace(0.01,1,20)
+#     if ratio_candidates is None:
+#         ratio_candidates = np.linspace(0.01,1,20)
 
-    if len(cells) != len(labels):
-        raise ValueError("Number of cells and labels should be the same!")
+#     if len(cells) != len(labels):
+#         raise ValueError("Number of cells and labels should be the same!")
 
-    unique_labels = np.unique(labels)
-    combination_labels = list(combinations(unique_labels, 2))
-    pairs_key = [f'{label1} vs {label2}' for label1,label2 in combination_labels]
+#     unique_labels = np.unique(labels)
+#     combination_labels = list(combinations(unique_labels, 2))
+#     pairs_key = [f'{label1} vs {label2}' for label1,label2 in combination_labels]
 
-    homogeneity_history, homogeneity_std = {label:[] for label in pairs_key}, {label:[] for label in pairs_key}
-    completness_history, completness_std = {label:[] for label in pairs_key}, {label:[] for label in pairs_key}
-    ari_history, ari_std = {label:[] for label in pairs_key}, {label:[] for label in pairs_key}
-    v_history, v_std = {label:[] for label in pairs_key}, {label:[] for label in pairs_key}
-    correct_history, correct_std = {label:[] for label in pairs_key}, {label:[] for label in pairs_key}
+#     homogeneity_history, homogeneity_std = {label:[] for label in pairs_key}, {label:[] for label in pairs_key}
+#     completness_history, completness_std = {label:[] for label in pairs_key}, {label:[] for label in pairs_key}
+#     ari_history, ari_std = {label:[] for label in pairs_key}, {label:[] for label in pairs_key}
+#     v_history, v_std = {label:[] for label in pairs_key}, {label:[] for label in pairs_key}
+#     correct_history, correct_std = {label:[] for label in pairs_key}, {label:[] for label in pairs_key}
 
-    for ratio in ratio_candidates:
-        print(f"Ratio={ratio:.3f}")
-        if(ratio < 1):
-            thinned_cells = thinning(cells,reduction_ratio=ratio,same_reads=False,copy=True)
-            thinned_cells = update_data(thinned_cells)
-        else:
-            thinned_cells = cells
-            thinned_cells = update_data(thinned_cells, n_neighbors=n_neighbors,n_comps=100,random_state=42,normalization=normalization)
+#     for ratio in ratio_candidates:
+#         print(f"Ratio={ratio:.3f}")
+#         if(ratio < 1):
+#             thinned_cells = thinning(cells,reduction_ratio=ratio,same_reads=False,copy=True)
+#             thinned_cells = update_data(thinned_cells)
+#         else:
+#             thinned_cells = cells
+#             thinned_cells = update_data(thinned_cells, n_neighbors=n_neighbors,n_comps=100,random_state=42,normalization=normalization)
 
-        sc.pp.neighbors(thinned_cells,n_neighbors=n_neighbors,n_pcs=100)
-        results = find_best_resolution(data=thinned_cells,true_labels=labels,n_neighbors=None,n_trials=50,method=search_resolution_method,show=False)
-        resolution = results["resolution"]
+#         sc.pp.neighbors(thinned_cells,n_neighbors=n_neighbors,n_pcs=100)
+#         results = find_best_resolution(data=thinned_cells,true_labels=labels,n_neighbors=None,n_trials=50,method=search_resolution_method,show=False)
+#         resolution = results["resolution"]
 
-        h_runs, c_runs, v_runs, a_runs, ct_runs = {label:[] for label in pairs_key}, {label:[] for label in pairs_key}, {label:[] for label in pairs_key}, {label:[] for label in pairs_key}, {label:[] for label in pairs_key}
+#         h_runs, c_runs, v_runs, a_runs, ct_runs = {label:[] for label in pairs_key}, {label:[] for label in pairs_key}, {label:[] for label in pairs_key}, {label:[] for label in pairs_key}, {label:[] for label in pairs_key}
     
-        for seed in range(n_runs):
-            sc.tl.leiden(thinned_cells,resolution=resolution,key_added='leiden_temp', random_state=np.random.randint(0, MAX_RNG_RANGE))
-            leiden_labels = thinned_cells.obs['leiden_temp']
+#         for seed in range(n_runs):
+#             sc.tl.leiden(thinned_cells,resolution=resolution,key_added='leiden_temp', random_state=np.random.randint(0, MAX_RNG_RANGE))
+#             leiden_labels = thinned_cells.obs['leiden_temp']
             
-            for label1, label2 in combination_labels:
-                mask = (labels == label1) | (labels == label2)
-                if mask.sum() == 0:
-                    continue
+#             for label1, label2 in combination_labels:
+#                 mask = (labels == label1) | (labels == label2)
+#                 if mask.sum() == 0:
+#                     continue
 
-                scores = compute_all_scores(true_labels=labels[mask],cluster_labels=leiden_labels[mask])
-                h,c,v,ari,correct = scores["homogeneity"], scores["completness"], scores["v"], scores["ari"], scores["correct"]
+#                 scores = compute_all_scores(true_labels=labels[mask],cluster_labels=leiden_labels[mask])
+#                 h,c,v,ari,correct = scores["homogeneity"], scores["completness"], scores["v"], scores["ari"], scores["correct"]
 
-                pair_key = f"{label1} vs {label2}"
-                h_runs[pair_key].append(h)
-                c_runs[pair_key].append(c)
-                v_runs[pair_key].append(v)
-                a_runs[pair_key].append(ari)
-                ct_runs[pair_key].append(correct)
+#                 pair_key = f"{label1} vs {label2}"
+#                 h_runs[pair_key].append(h)
+#                 c_runs[pair_key].append(c)
+#                 v_runs[pair_key].append(v)
+#                 a_runs[pair_key].append(ari)
+#                 ct_runs[pair_key].append(correct)
 
-        for label in pairs_key:
-            homogeneity_history[label].append(np.mean(h_runs[label]));  homogeneity_std[label].append(np.std(h_runs[label]))
-            completness_history[label].append(np.mean(c_runs[label]));  completness_std[label].append(np.std(c_runs[label]))
-            ari_history[label].append(np.mean(a_runs[label]));          ari_std[label].append(np.std(a_runs[label]))
-            v_history[label].append(np.mean(v_runs[label]));            v_std[label].append(np.std(v_runs[label]))
-            correct_history[label].append(np.mean(ct_runs[label]));     correct_std[label].append(np.std(ct_runs[label]))
-        print("\n")
+#         for label in pairs_key:
+#             homogeneity_history[label].append(np.mean(h_runs[label]));  homogeneity_std[label].append(np.std(h_runs[label]))
+#             completness_history[label].append(np.mean(c_runs[label]));  completness_std[label].append(np.std(c_runs[label]))
+#             ari_history[label].append(np.mean(a_runs[label]));          ari_std[label].append(np.std(a_runs[label]))
+#             v_history[label].append(np.mean(v_runs[label]));            v_std[label].append(np.std(v_runs[label]))
+#             correct_history[label].append(np.mean(ct_runs[label]));     correct_std[label].append(np.std(ct_runs[label]))
+#         print("\n")
 
-    if show:
-        n_scores = 5
-        n_cols = int(np.ceil(np.sqrt(n_scores)))
-        n_rows = int(np.ceil(n_scores / n_cols))
-        fig, axs = plt.subplots(nrows=n_rows,ncols=n_cols,figsize=(n_cols*3 + 8,n_rows*3))
-        axs = axs.flatten()
+#     if show:
+#         n_scores = 5
+#         n_cols = int(np.ceil(np.sqrt(n_scores)))
+#         n_rows = int(np.ceil(n_scores / n_cols))
+#         fig, axs = plt.subplots(nrows=n_rows,ncols=n_cols,figsize=(n_cols*3 + 8,n_rows*3))
+#         axs = axs.flatten()
 
-        r = ratio_candidates
+#         r = ratio_candidates
 
-        def plot_with_band(x, mean, std, label, color=None, linestyle="-",ax=None):
-            mean, std = np.array(mean), np.array(std)
-            ci = 1.96 * std / np.sqrt(n_runs)  # intervalle de confiance à 95%
-            ax.plot(x, mean, color=color, linestyle=linestyle, label=label)
-            ax.fill_between(x, mean - ci, mean + ci, color=color, alpha=0.15)
+#         def plot_with_band(x, mean, std, label, color=None, linestyle="-",ax=None):
+#             mean, std = np.array(mean), np.array(std)
+#             ci = 1.96 * std / np.sqrt(n_runs)  # intervalle de confiance à 95%
+#             ax.plot(x, mean, color=color, linestyle=linestyle, label=label)
+#             ax.fill_between(x, mean - ci, mean + ci, color=color, alpha=0.15)
 
-        scores_history = [(homogeneity_history,homogeneity_std),(completness_history,completness_std),(correct_history,correct_std),(ari_history,ari_std),(v_history,v_std)]
-        colors = ["blue", "red", "orange","green", "black"]
-        score_labels = ["homogeneity","completness","correctly classified cells","ari","v"]
-        for i in range(n_scores):
+#         scores_history = [(homogeneity_history,homogeneity_std),(completness_history,completness_std),(correct_history,correct_std),(ari_history,ari_std),(v_history,v_std)]
+#         colors = ["blue", "red", "orange","green", "black"]
+#         score_labels = ["homogeneity","completness","correctly classified cells","ari","v"]
+#         for i in range(n_scores):
 
-            score_to_plot, std_to_plot = scores_history[i]
-            color = colors[i]
-            score_label = score_labels[i]
+#             score_to_plot, std_to_plot = scores_history[i]
+#             color = colors[i]
+#             score_label = score_labels[i]
 
-            for label in pairs_key:
-                plot_with_band(r, score_to_plot[label], std_to_plot[label], color=None, label=label, ax=axs[i])
+#             for label in pairs_key:
+#                 plot_with_band(r, score_to_plot[label], std_to_plot[label], color=None, label=label, ax=axs[i])
 
-            axs[i].invert_xaxis()
-            axs[i].set_title(score_labels[i])
-            #axs[i].legend()
-            axs[i].grid(True,alpha=0.6)
-            axs[i].set_xlabel("r")
-            axs[i].set_ylabel("score")
+#             axs[i].invert_xaxis()
+#             axs[i].set_title(score_labels[i])
+#             #axs[i].legend()
+#             axs[i].grid(True,alpha=0.6)
+#             axs[i].set_xlabel("r")
+#             axs[i].set_ylabel("score")
 
-        handles, legend_labels = axs[0].get_legend_handles_labels()
-        fig.legend(handles, legend_labels, loc='upper right')
-        plt.suptitle(f"k={n_neighbors}")
+#         handles, legend_labels = axs[0].get_legend_handles_labels()
+#         fig.legend(handles, legend_labels, loc='upper right')
+#         plt.suptitle(f"k={n_neighbors}")
 
-        plt.subplots_adjust(left=None, right=None, top=0.55, bottom=None, wspace=0.4, hspace=None)
+#         plt.subplots_adjust(left=None, right=None, top=0.55, bottom=None, wspace=0.4, hspace=None)
 
-        for j in range(n_scores, len(axs)):
-            axs[j].set_visible(False)
-        plt.show()
+#         for j in range(n_scores, len(axs)):
+#             axs[j].set_visible(False)
+#         plt.show()
 
 
-    return {
-        "homogeneity": homogeneity_history,
-        "completness": completness_history,
-        "ari": ari_history,
-        "v": v_history,
-        "correct": correct_history,
-    }
+#     return {
+#         "homogeneity": homogeneity_history,
+#         "completness": completness_history,
+#         "ari": ari_history,
+#         "v": v_history,
+#         "correct": correct_history,
+#     }
 
 def study_group_sparsity(cells, labels, ratio_candidates=None, n_runs=50, n_neighbors=15, normalization="sct", search_resolution_method="optuna", show=False):
+    """
+    Lance une étude de la sparsité sur le anndata 'cells' à partir des 'labels' ground truth.
+    On calcule les scores de chaque ratio candidat figurant dans 'ratio_candidates'.
+    Retourne les historiques de scores pour chaque couple de label ground truth.
+
+    Ces scores sont calculés à partir de liste de labels filtrés obtenues en filtrant les labels obtenus par leiden sur tous les couples possibles.
+    Par exemple, si labels=[0,2,1,2,0] et leiden_labels=[0,0,2,2,1], alors on peut calculer les scores du couple (0,1) (ground truth) en prenant
+    le sous-tableau sublabels = [0,1,0] et le sous-tableau leiden_sublabels=[0,2,1].
+
+    cells: objet anndata/scanpy (dataframe)
+    labels: list/array des labels ground truth. Un label est un entier entre 0 et n_class-1.
+    n_runs: nombre d'instances à lancer pour trouver le meilleur partitionnement
+    n_neighbors: nombre de plus proches voisins dans le graphe de k-NearestNeighbors (voir algorithme de Leiden).
+    search_resolution_method: choix de la méthode d'optimisation pour trouver la meilleure résolution de leiden
+    stats: manière d'obtenir le partitionnement de leiden après 'n_runs'. Choix: 'average' ou 'highest'.
+    runs_on_thinning: Si True alors le thinning se fera à chaque run de Leiden plutôt qu'en amont des runs.
+    show: True alors on affiche l'évolution des scores selon le ratio de sparsité.
+    """
     from itertools import combinations
 
     if ratio_candidates is None:
@@ -434,6 +533,7 @@ def study_group_sparsity(cells, labels, ratio_candidates=None, n_runs=50, n_neig
     combination_labels = list(combinations(unique_labels, 2))
     pairs_key = [f'{label1} vs {label2}' for label1, label2 in combination_labels]
 
+    # Cette fois-ci, historique des scores par couple
     homogeneity_history, homogeneity_std = {label: [] for label in pairs_key}, {label: [] for label in pairs_key}
     completness_history, completness_std = {label: [] for label in pairs_key}, {label: [] for label in pairs_key}
     ari_history, ari_std = {label: [] for label in pairs_key}, {label: [] for label in pairs_key}
@@ -459,12 +559,13 @@ def study_group_sparsity(cells, labels, ratio_candidates=None, n_runs=50, n_neig
             sc.tl.leiden(thinned_cells, resolution=resolution, key_added='leiden_temp', random_state=np.random.randint(0, MAX_RNG_RANGE))
             leiden_labels = thinned_cells.obs['leiden_temp']
 
+            # Masquage du label de partionnement obtenu, selon chaque couple de labels ground truth.
             for label1, label2 in combination_labels:
-                mask = (labels == label1) | (labels == label2)
+                mask = (labels == label1) | (labels == label2) # masque
                 if mask.sum() == 0:
                     continue
 
-                scores = compute_all_scores(true_labels=labels[mask], cluster_labels=leiden_labels[mask])
+                scores = compute_all_scores(true_labels=labels[mask], cluster_labels=leiden_labels[mask]) # calcul des scores pour les sous-listes de labels
                 pair_key = f"{label1} vs {label2}"
                 h_runs[pair_key].append(scores["homogeneity"])
                 c_runs[pair_key].append(scores["completness"])
@@ -480,6 +581,7 @@ def study_group_sparsity(cells, labels, ratio_candidates=None, n_runs=50, n_neig
             correct_history[label].append(np.mean(ct_runs[label]));     correct_std[label].append(np.std(ct_runs[label]))
         print("\n")
 
+    # Affichage ?
     if show:
         n_scores = 5
         n_cols = int(np.ceil(np.sqrt(n_scores)))
@@ -498,6 +600,7 @@ def study_group_sparsity(cells, labels, ratio_candidates=None, n_runs=50, n_neig
         scores_history = [(homogeneity_history, homogeneity_std), (completness_history, completness_std), (correct_history, correct_std), (ari_history, ari_std), (v_history, v_std)]
         score_labels = ["homogeneity", "completness", "correctly classified cells", "ari", "v"]
 
+        # On affiche tous les couples sur chaque score. (Graphique peu lisible...)
         for i in range(n_scores):
             score_to_plot, std_to_plot = scores_history[i]
 
@@ -530,122 +633,137 @@ def study_group_sparsity(cells, labels, ratio_candidates=None, n_runs=50, n_neig
         "correct": correct_history,
     }
 
-def study_group_sparsity_exclude_nostdthinning(cells, labels, ratio_candidates=None, n_runs=50, n_neighbors=15, normalization="sct", search_resolution_method="optuna", stats="average", show=False):
-    from itertools import combinations
+# def study_group_sparsity_exclude_nostdthinning(cells, labels, ratio_candidates=None, n_runs=50, n_neighbors=15, normalization="sct", search_resolution_method="optuna", stats="average", show=False):
+#     from itertools import combinations
 
-    if ratio_candidates is None:
-        ratio_candidates = np.linspace(0.01,1,20)
+#     if ratio_candidates is None:
+#         ratio_candidates = np.linspace(0.01,1,20)
 
-    if len(cells) != len(labels):
-        raise ValueError("Number of cells and labels should be the same!")
+#     if len(cells) != len(labels):
+#         raise ValueError("Number of cells and labels should be the same!")
 
-    unique_labels = np.append(np.unique(labels), 'no-exclusion')
-    homogeneity_history, homogeneity_std = {label:[] for label in unique_labels}, {label:[] for label in unique_labels}
-    completness_history, completness_std = {label:[] for label in unique_labels}, {label:[] for label in unique_labels}
-    ari_history, ari_std = {label:[] for label in unique_labels}, {label:[] for label in unique_labels}
-    v_history, v_std = {label:[] for label in unique_labels}, {label:[] for label in unique_labels}
-    correct_history, correct_std = {label:[] for label in unique_labels}, {label:[] for label in unique_labels}
+#     unique_labels = np.append(np.unique(labels), 'no-exclusion')
+#     homogeneity_history, homogeneity_std = {label:[] for label in unique_labels}, {label:[] for label in unique_labels}
+#     completness_history, completness_std = {label:[] for label in unique_labels}, {label:[] for label in unique_labels}
+#     ari_history, ari_std = {label:[] for label in unique_labels}, {label:[] for label in unique_labels}
+#     v_history, v_std = {label:[] for label in unique_labels}, {label:[] for label in unique_labels}
+#     correct_history, correct_std = {label:[] for label in unique_labels}, {label:[] for label in unique_labels}
 
-    for ratio in ratio_candidates:
-        print(f"Ratio={ratio:.3f}")
-        if(ratio < 1):
-            thinned_cells = thinning(cells,reduction_ratio=ratio,same_reads=False,copy=True)
-            thinned_cells = update_data(thinned_cells)
-        else:
-            thinned_cells = cells
-            thinned_cells = update_data(thinned_cells, n_neighbors=n_neighbors,n_comps=100,random_state=42,normalization=normalization)
+#     for ratio in ratio_candidates:
+#         print(f"Ratio={ratio:.3f}")
+#         if(ratio < 1):
+#             thinned_cells = thinning(cells,reduction_ratio=ratio,same_reads=False,copy=True)
+#             thinned_cells = update_data(thinned_cells)
+#         else:
+#             thinned_cells = cells
+#             thinned_cells = update_data(thinned_cells, n_neighbors=n_neighbors,n_comps=100,random_state=42,normalization=normalization)
 
-        sc.pp.neighbors(thinned_cells,n_neighbors=n_neighbors,n_pcs=100)
-        results = find_best_resolution(data=thinned_cells,true_labels=labels,n_neighbors=None,n_trials=50,method=search_resolution_method,show=False)
-        resolution = results["resolution"]
+#         sc.pp.neighbors(thinned_cells,n_neighbors=n_neighbors,n_pcs=100)
+#         results = find_best_resolution(data=thinned_cells,true_labels=labels,n_neighbors=None,n_trials=50,method=search_resolution_method,show=False)
+#         resolution = results["resolution"]
 
-        h_runs, c_runs, v_runs, a_runs, ct_runs = {label:[] for label in unique_labels}, {label:[] for label in unique_labels}, {label:[] for label in unique_labels}, {label:[] for label in unique_labels}, {label:[] for label in unique_labels}
+#         h_runs, c_runs, v_runs, a_runs, ct_runs = {label:[] for label in unique_labels}, {label:[] for label in unique_labels}, {label:[] for label in unique_labels}, {label:[] for label in unique_labels}, {label:[] for label in unique_labels}
     
-        for seed in range(n_runs):
-            sc.tl.leiden(thinned_cells,resolution=resolution,key_added='leiden_temp', random_state=np.random.randint(0, MAX_RNG_RANGE))
-            leiden_labels = thinned_cells.obs['leiden_temp']
+#         for seed in range(n_runs):
+#             sc.tl.leiden(thinned_cells,resolution=resolution,key_added='leiden_temp', random_state=np.random.randint(0, MAX_RNG_RANGE))
+#             leiden_labels = thinned_cells.obs['leiden_temp']
             
-            for label in unique_labels:
-                mask = (labels != label)
-                if mask.sum() == 0:
-                    continue
+#             for label in unique_labels:
+#                 mask = (labels != label)
+#                 if mask.sum() == 0:
+#                     continue
 
-                scores = compute_all_scores(true_labels=labels[mask],cluster_labels=leiden_labels[mask])
-                h,c,v,ari,correct = scores["homogeneity"], scores["completness"], scores["v"], scores["ari"], scores["correct"]
+#                 scores = compute_all_scores(true_labels=labels[mask],cluster_labels=leiden_labels[mask])
+#                 h,c,v,ari,correct = scores["homogeneity"], scores["completness"], scores["v"], scores["ari"], scores["correct"]
 
-                h_runs[label].append(h)
-                c_runs[label].append(c)
-                v_runs[label].append(v)
-                a_runs[label].append(ari)
-                ct_runs[label].append(correct)
+#                 h_runs[label].append(h)
+#                 c_runs[label].append(c)
+#                 v_runs[label].append(v)
+#                 a_runs[label].append(ari)
+#                 ct_runs[label].append(correct)
 
-        for label in unique_labels:
-            homogeneity_history[label].append(np.mean(h_runs[label]));  homogeneity_std[label].append(np.std(h_runs[label]))
-            completness_history[label].append(np.mean(c_runs[label]));  completness_std[label].append(np.std(c_runs[label]))
-            ari_history[label].append(np.mean(a_runs[label]));          ari_std[label].append(np.std(a_runs[label]))
-            v_history[label].append(np.mean(v_runs[label]));            v_std[label].append(np.std(v_runs[label]))
-            correct_history[label].append(np.mean(ct_runs[label]));     correct_std[label].append(np.std(ct_runs[label]))
-        print("\n")
+#         for label in unique_labels:
+#             homogeneity_history[label].append(np.mean(h_runs[label]));  homogeneity_std[label].append(np.std(h_runs[label]))
+#             completness_history[label].append(np.mean(c_runs[label]));  completness_std[label].append(np.std(c_runs[label]))
+#             ari_history[label].append(np.mean(a_runs[label]));          ari_std[label].append(np.std(a_runs[label]))
+#             v_history[label].append(np.mean(v_runs[label]));            v_std[label].append(np.std(v_runs[label]))
+#             correct_history[label].append(np.mean(ct_runs[label]));     correct_std[label].append(np.std(ct_runs[label]))
+#         print("\n")
 
-    if show:
-        n_scores = 5
-        n_cols = int(np.ceil(np.sqrt(n_scores)))
-        n_rows = int(np.ceil(n_scores / n_cols))
-        fig, axs = plt.subplots(nrows=n_rows,ncols=n_cols,figsize=(n_cols*3 + 1,n_rows*3))
-        axs = axs.flatten()
+#     if show:
+#         n_scores = 5
+#         n_cols = int(np.ceil(np.sqrt(n_scores)))
+#         n_rows = int(np.ceil(n_scores / n_cols))
+#         fig, axs = plt.subplots(nrows=n_rows,ncols=n_cols,figsize=(n_cols*3 + 1,n_rows*3))
+#         axs = axs.flatten()
 
-        r = ratio_candidates
+#         r = ratio_candidates
 
-        def plot_with_band(x, mean, std, label, color=None, linestyle="-",ax=None):
-            mean, std = np.array(mean), np.array(std)
-            ci = 1.96 * std / np.sqrt(n_runs)  # intervalle de confiance à 95%
-            ax.plot(x, mean, color=color, linestyle=linestyle, label=label)
-            ax.fill_between(x, mean - ci, mean + ci, color=color, alpha=0.15)
+#         def plot_with_band(x, mean, std, label, color=None, linestyle="-",ax=None):
+#             mean, std = np.array(mean), np.array(std)
+#             ci = 1.96 * std / np.sqrt(n_runs)  # intervalle de confiance à 95%
+#             ax.plot(x, mean, color=color, linestyle=linestyle, label=label)
+#             ax.fill_between(x, mean - ci, mean + ci, color=color, alpha=0.15)
 
-        scores_history = [(homogeneity_history,homogeneity_std),(completness_history,completness_std),(correct_history,correct_std),(ari_history,ari_std),(v_history,v_std)]
-        colors = ["blue", "red", "orange","green", "black"]
-        score_labels = ["homogeneity","completness","correctly classified cells","ari","v"]
+#         scores_history = [(homogeneity_history,homogeneity_std),(completness_history,completness_std),(correct_history,correct_std),(ari_history,ari_std),(v_history,v_std)]
+#         colors = ["blue", "red", "orange","green", "black"]
+#         score_labels = ["homogeneity","completness","correctly classified cells","ari","v"]
         
-        for i in range(n_scores):
+#         for i in range(n_scores):
 
-            score_to_plot, std_to_plot = scores_history[i]
-            color = colors[i]
-            score_label = score_labels[i]
+#             score_to_plot, std_to_plot = scores_history[i]
+#             color = colors[i]
+#             score_label = score_labels[i]
 
-            for label in unique_labels:
-                if label=="no-exclusion":
-                    plot_with_band(r, score_to_plot[label], std_to_plot[label], color=None, label=label, linestyle="--", ax=axs[i])
-                else:
-                    plot_with_band(r, score_to_plot[label], std_to_plot[label], color=None, label=label, linestyle="-", ax=axs[i])
+#             for label in unique_labels:
+#                 if label=="no-exclusion":
+#                     plot_with_band(r, score_to_plot[label], std_to_plot[label], color=None, label=label, linestyle="--", ax=axs[i])
+#                 else:
+#                     plot_with_band(r, score_to_plot[label], std_to_plot[label], color=None, label=label, linestyle="-", ax=axs[i])
 
-            axs[i].invert_xaxis()
-            axs[i].set_title(score_labels[i])
-            #axs[i].legend()
-            axs[i].grid(True,alpha=0.6)
-            axs[i].set_xlabel("r")
-            axs[i].set_ylabel("score")
+#             axs[i].invert_xaxis()
+#             axs[i].set_title(score_labels[i])
+#             #axs[i].legend()
+#             axs[i].grid(True,alpha=0.6)
+#             axs[i].set_xlabel("r")
+#             axs[i].set_ylabel("score")
 
-        handles, legend_labels = axs[0].get_legend_handles_labels()
-        fig.legend(handles, legend_labels, loc='upper right',ncol=len(unique_labels))
-        #plt.suptitle(f"k={n_neighbors}")
+#         handles, legend_labels = axs[0].get_legend_handles_labels()
+#         fig.legend(handles, legend_labels, loc='upper right',ncol=len(unique_labels))
+#         #plt.suptitle(f"k={n_neighbors}")
 
-        plt.subplots_adjust(left=None, right=None, top=0.9, bottom=None, wspace=0.4, hspace=0.25)
+#         plt.subplots_adjust(left=None, right=None, top=0.9, bottom=None, wspace=0.4, hspace=0.25)
 
-        for j in range(n_scores, len(axs)):
-            axs[j].set_visible(False)
-        plt.show()
+#         for j in range(n_scores, len(axs)):
+#             axs[j].set_visible(False)
+#         plt.show()
 
 
-    return {
-        "homogeneity": homogeneity_history,
-        "completness": completness_history,
-        "ari": ari_history,
-        "v": v_history,
-        "correct": correct_history,
-    }
+#     return {
+#         "homogeneity": homogeneity_history,
+#         "completness": completness_history,
+#         "ari": ari_history,
+#         "v": v_history,
+#         "correct": correct_history,
+#     }
 
 def study_group_sparsity_exclude(cells, labels, ratio_candidates=None, n_runs=50, n_neighbors=15, normalization="sct", search_resolution_method="optuna", show=False):
-
+    """
+    Lance une étude de la sparsité sur le anndata 'cells' à partir des 'labels' ground truth.
+    On calcule les scores de chaque ratio candidat figurant dans 'ratio_candidates'.
+    Retourne les historiques de scores d'exclusion. Les scores d'exclusion sont calculés à partir de liste de labels filtrés
+    obtenus en filtrant les cellules d'un label ground truth spécifique (on exclut un type cellulaire et on observe les scores du partitionnement sur les cellules restantes),
+    et ceci pour chaque label ground truth.
+    
+    cells: objet anndata/scanpy (dataframe)
+    labels: list/array des labels ground truth. Un label est un entier entre 0 et n_class-1.
+    n_runs: nombre d'instances à lancer pour trouver le meilleur partitionnement
+    n_neighbors: nombre de plus proches voisins dans le graphe de k-NearestNeighbors (voir algorithme de Leiden).
+    search_resolution_method: choix de la méthode d'optimisation pour trouver la meilleure résolution de leiden
+    stats: manière d'obtenir le partitionnement de leiden après 'n_runs'. Choix: 'average' ou 'highest'.
+    runs_on_thinning: Si True alors le thinning se fera à chaque run de Leiden plutôt qu'en amont des runs.
+    show: True alors on affiche l'évolution des scores selon le ratio de sparsité.
+    """
     if ratio_candidates is None:
         ratio_candidates = np.linspace(0.01, 1, 20)
 
@@ -653,6 +771,8 @@ def study_group_sparsity_exclude(cells, labels, ratio_candidates=None, n_runs=50
         raise ValueError("Number of cells and labels should be the same!")
 
     unique_labels = np.append(np.unique(labels), 'no-exclusion')
+
+    # Cette fois-ci, on calcule les scores pour chaque exclusion possible
     homogeneity_history, homogeneity_std = {label: [] for label in unique_labels}, {label: [] for label in unique_labels}
     completness_history, completness_std = {label: [] for label in unique_labels}, {label: [] for label in unique_labels}
     ari_history, ari_std = {label: [] for label in unique_labels}, {label: [] for label in unique_labels}
@@ -678,12 +798,13 @@ def study_group_sparsity_exclude(cells, labels, ratio_candidates=None, n_runs=50
             sc.tl.leiden(thinned_cells, resolution=resolution, key_added='leiden_temp', random_state=np.random.randint(0, MAX_RNG_RANGE))
             leiden_labels = thinned_cells.obs['leiden_temp']
 
+            # Masquage du label de partionnement obtenu, en excluant un label ground truth spécifique, pour chaque label ground truth.
             for label in unique_labels:
-                mask = (labels != label)
+                mask = (labels != label) # masque
                 if mask.sum() == 0:
                     continue
 
-                scores = compute_all_scores(true_labels=labels[mask], cluster_labels=leiden_labels[mask])
+                scores = compute_all_scores(true_labels=labels[mask], cluster_labels=leiden_labels[mask]) # calcul des scores pour les sous listes de labels
                 h_runs[label].append(scores["homogeneity"])
                 c_runs[label].append(scores["completness"])
                 v_runs[label].append(scores["v"])
@@ -698,6 +819,7 @@ def study_group_sparsity_exclude(cells, labels, ratio_candidates=None, n_runs=50
             correct_history[label].append(np.mean(ct_runs[label]));     correct_std[label].append(np.std(ct_runs[label]))
         print("\n")
 
+    # Affichage ?
     if show:
         n_scores = 5
         n_cols = int(np.ceil(np.sqrt(n_scores)))
