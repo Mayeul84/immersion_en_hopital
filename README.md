@@ -100,6 +100,7 @@ python cell_types.py
 Les résultats (figures `.png`, labels Leiden `.parquet`/`.csv`) sont sauvegardés dans le dossier `plots/` correspondant.
 Le fichier `cell_types.py` correspond au partitionnement des grands types cellulaires d'intérêt (Stéroïdes, Myéloïdes, Endothéliales et Fibroblates).
 
+Les scripts racines (`cell_types.py`, `endothelial.py`, `fibroblast.py`, `myeloid.py`) servent de points d'entrée et font appel aux fonctions définies dans `scripts/` pour le clustering, le sous-échantillonnage, le scoring et l'affichage.
 ### Parallélisation
 
 Les études sont conçues pour tourner sur 16 cœurs CPU. Le nombre de threads est configurable en tête de chaque script :
