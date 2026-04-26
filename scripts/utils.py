@@ -25,7 +25,7 @@ PROJECT_PATH = ... # A CHANGER, METTRE LE CHEMIN ACTUEL DU PROJET. Exemple: r"C:
 RESULTS_PATH = PROJECT_PATH + r"\results"
 FIGURES_PATH = RESULTS_PATH + r"\figures"
 
-### Pour charger et exporter les données .h5ad
+### Pour charger et exporter les données .h5ad. NE PAS OUBLIER DE METTRE LE FICHIER 'single_cells.h5ad' DANS CE DOSSIER DATA !!
 DATA_PATH = PROJECT_PATH + r"\data"
 
 ### Jeu de données originel (au format .h5ad)
