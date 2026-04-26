@@ -98,6 +98,7 @@ python cell_types.py
 ```
 
 Les résultats (figures `.png`, labels Leiden `.parquet`/`.csv`) sont sauvegardés dans le dossier `plots/` correspondant.
+Le fichier `cell_types.py` correspond au partitionnement des grands types cellulaires d'intérêt (Stéroïdes, Myéloïdes, Endothéliales et Fibroblates).
 
 ### Parallélisation
 
@@ -120,7 +121,7 @@ N = 16  # Nombre de CPUs à utiliser
 | Lymphoïdes        | 2 054              | —                   |
 | Chromaffines      | 192                | —                   |
 
-Les types en gras sont les populations d'intérêt principal.
+Les types en gras sont les populations d'intérêt principal (Stéroïdes ne nous intéresse que pour l'étude de `cell_types.py`).
 
 ---
 

@@ -1,3 +1,5 @@
+### Ce script sert à convertir un dataframe single cells au format .RDS en .h5ad traitable par Python
+
 path = ... # Dossier dans lequel la donnée est localisée. Exemple: path = r"(C:\Users\mayeu\Desktop\TRAVAIL\MVA\Cours\Projet médecin)"
 setwd(path)
 
