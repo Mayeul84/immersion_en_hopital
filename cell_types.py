@@ -35,7 +35,7 @@ from scripts.studies_opt import (study_sparsity, study_sparsity_with_trajectorie
                          study_complete_sparsity, study_group_sparsity, 
                          study_group_sparsity_exclude, study_group_sparsity_onevsall)
 
-SAVE_DIR = "plots_test/cell_types"
+SAVE_DIR = "plots/cell_types"
 os.makedirs(SAVE_DIR, exist_ok=True)
 
 print("="*50)
